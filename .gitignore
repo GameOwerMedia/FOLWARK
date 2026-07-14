@@ -1,0 +1,10 @@
+# Source art assets — everything is inlined into index.html as data URIs,
+# so the raw generated PNGs (75MB) are not needed to run the game.
+art/
+
+# Tooling / scratch
+.playwright-mcp/
+*.py
+__pycache__/
+.DS_Store
+Thumbs.db
