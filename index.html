@@ -538,7 +538,7 @@ const PROD_COEF = 1.75;
 // pig & goat ~16y, dog ~12y, sheep ~11y, hen ~7y — nobody dies "suddenly, all at once"
 const SPECIES = {
   pig:    { need: 1.15, str: 0.55, life: 770,  works: false, label: 'Pig',    size: 32, produce: 0,    diet: 'grain & meat',  repro: 0.020, gest: 18, grazer: false, meatVal: 12 },
-  dog:    { need: 0, meat: 1.05, str: 0.70, life: 575, works: false, label: 'Dog', size: 30, produce: 0, diet: 'meat', repro: 0.020, gest: 30, grazer: false, meatVal: 6 },
+  dog:    { need: 0, meat: 0.5, str: 0.70, life: 575, works: false, label: 'Dog', size: 30, produce: 0, diet: 'meat', repro: 0.020, gest: 30, grazer: false, meatVal: 6 },
   horse:  { need: 1.60, str: 2.10, life: 1340, works: true,  label: 'Horse',  size: 46, produce: 0,    diet: 'grass & grain', repro: 0.006, gest: 44, grazer: true,  meatVal: 24 },
   donkey: { need: 1.10, str: 1.10, life: 1680, works: true,  label: 'Donkey', size: 38, produce: 0,    diet: 'grass',         repro: 0.004, gest: 50, grazer: true,  meatVal: 18 },
   cow:    { need: 1.50, str: 1.30, life: 960,  works: true,  label: 'Cow',    size: 44, produce: 1.2,  diet: 'grass & grain', repro: 0.012, gest: 40, grazer: true,  meatVal: 20 },
@@ -672,7 +672,7 @@ const hasMale = (species) => alive().some(a => a.species === species && a.sex ==
 
 // ============================== TIME & ECONOMY ==============================
 let day = 0, dayFrac = 0;
-let foodStock = 450, meatStock = 45;
+let foodStock = 450, meatStock = 60;
 const GRASS_CAP = 400, WATER_CAP = 300;
 let grassStock = 300, waterStock = 240, dogStarve = 0;
 const sacrifices = {};
@@ -762,8 +762,8 @@ function economyStep() {
       let got = Math.min(want, foodStock);
       foodStock -= got; consumed += got;
       if (a.species === 'pig' && got < want) {
-        // pigs are omnivores — when grain runs short, they eat from the dogs' larder
-        const m2 = Math.min((want - got) * 0.8, meatStock);
+        // pigs are omnivores — when grain runs short, they take a little from the dogs' larder
+        const m2 = Math.min((want - got) * 0.45, meatStock);
         meatStock -= m2;
         got += m2;
       }
@@ -773,10 +773,11 @@ function economyStep() {
     a.thirst = clamp(a.thirst + (seasonOf(day) === 1 ? 0.2 : 0.15) * a.metab, 0, 1);
     a.health = clamp(a.health + (0.48 - a.hunger) * ((built.infirmary ? 0.075 : 0.05) + (built.well ? 0.008 : 0)) - (a.thirst > 0.9 ? 0.02 : 0) - Math.max(0, a.age - a.lifespan) * 0.0002, 0, 1);
   }
-  // hungry dogs take matters into their own teeth
+  // the pack hunts rats, rabbits and scraps — a small pack feeds itself, a large one cannot
   const dogsN2 = dogsAlive().length;
+  if (dogsN2) meatStock = Math.min(meatStock + Math.min(dogsN2 * 0.62, 2.2), 130);
   dogStarve = (dogsN2 && dogFillSum / dogsN2 < 0.4) ? dogStarve + 1 : 0;
-  if (dogStarve >= 3) {
+  if (dogStarve >= 4) {
     dogStarve = 0;
     const prey = alive().filter(a => a.species !== 'dog' && a.role !== 'leader')
       .sort((a, b) => a.strength * a.health - b.strength * b.health)[0];
@@ -1223,6 +1224,9 @@ const MARKET = [
   { id: 'horse', label: 'Buy a horse', cost: '&minus;6 wks grain', cd: 16,
     can: () => bufferDays() >= 9 && alive().length < POP_CAP,
     fn() { foodStock -= dailyNeedTotal() * 6; arriveAnimal('horse'); } },
+  { id: 'pig', label: 'Buy a pig', cost: '&minus;5 wks grain &middot; grows the council', cd: 18,
+    can: () => bufferDays() >= 8 && alive().length < POP_CAP,
+    fn() { foodStock -= dailyNeedTotal() * 5; const p = arriveAnimal('pig', 'a pig arrives at the gate &middot; another mouth at the table'); if (p) journal('<span class="n">the pig council grows &mdash; and so does the appetite for power</span>'); } },
   { id: 'dog', label: 'Buy a dog', cost: '&minus;2 wks grain &minus;8 meat', cd: 14,
     can: () => bufferDays() >= 5 && meatStock >= 8 && alive().length < POP_CAP,
     fn() { foodStock -= dailyNeedTotal() * 2; meatStock -= 8; const d = arriveAnimal('dog'); if (d) d.role = 'enforcer'; } }
@@ -1415,9 +1419,9 @@ function resetRun() {
   seq = 1;
   initPopulation();
   placeAtHomes();
-  foodStock = 450; meatStock = 45; grassStock = 300; waterStock = 240; dogStarve = 0;
+  foodStock = 450; meatStock = 60; grassStock = 300; waterStock = 240; dogStarve = 0;
   for (const k in sacrifices) delete sacrifices[k];
-  dilemmaCd = 16;
+  dilemmaCd = 40;
   day = 0; announcedPC = 1; realPC = 1;
   purgesTotal = 0; revolutions = 0; leaderSince = 0;
   purgeCooldown = 0; riseCooldown = 20; coupCooldown = 30; famineLogged = false;
@@ -1459,7 +1463,7 @@ function dailyStep() {
 }
 
 // ============================== DILEMMAS ==============================
-let dilemmaCd = 16;
+let dilemmaCd = 40;
 const DILEMMAS = [
   { id: 'knacker',
     when: () => meatStock < dogsAlive().length * 2 && alive().some(a => a.species === 'horse' && a.age > a.lifespan * 0.75),
@@ -1524,10 +1528,10 @@ const DILEMMAS = [
 function dilemmaStep() {
   if (dilemmaCd-- > 0 || popupOpen) return;
   const ready = DILEMMAS.filter(d => d.when());
-  if (ready.length && Math.random() < 0.35) {
+  if (ready.length && Math.random() < 0.28) {
     pick(ready).run();
-    dilemmaCd = 26;
-  } else dilemmaCd = 6;
+    dilemmaCd = 52;
+  } else dilemmaCd = 14;
 }
 
 // ============================== FEEDS / BANNER ==============================
@@ -1705,7 +1709,7 @@ function updatePanels() {
     rc('wheat', bufferR.toFixed(0) + 'w', 'Grain: weeks of stock at current need', bufferR < 4 ? 'warn' : '') +
     rc('grass', Math.round(grassStock / GRASS_CAP * 100) + '%', 'The meadow: grazers eat it, seasons regrow it. Overgrazed = hay comes out of the grain.', grassStock < 70 ? 'warn' : '') +
     rc('drop', Math.round(waterStock / WATER_CAP * 100) + '%', 'The waterhole: drunk dry in summer, refilled by rain. The well helps.', waterStock < 50 ? 'warn' : '') +
-    rc('bone', meatStock.toFixed(0), 'Meat for the dogs (' + dogsN + ' dogs eat ' + (dogsN * 1.05).toFixed(1) + '/wk). Hungry dogs feed themselves.', meatStock < dogsN * 3 ? 'warn' : '') +
+    rc('bone', meatStock.toFixed(0), 'Meat for the dogs (' + dogsN + ' dogs eat ' + (dogsN * 0.5).toFixed(1) + '/wk; the pack also hunts vermin). Hungry dogs feed themselves.', meatStock < dogsN * 3 ? 'warn' : '') +
     rc('hoofprint', alive().length, 'Population. This farm: ' + purgesTotal + ' purged, ' + revolutions + ' revolutions') +
     rc('heart', Math.round(avg('health') * 100) + '%', 'Average health of the animals') +
     rc('banner', Math.round(avg('loyalty') * 100) + '%', 'Average loyalty to the leader') +
@@ -1780,7 +1784,11 @@ function updatePanels() {
       statRow('pigs ×' + pigs.length + ' loyal', avgOf(pigs, 'loyalty'), '#D9A441') +
       statRow('dogs ×' + dogs2.length + ' loyal', avgOf(dogs2, 'loyalty'), '#93ACB8') +
       statRow('workers ×' + workers.length + ' loyal', avgOf(workers, 'loyalty'), '#E9E3D3') +
-      '<div class="pw"><span style="width:118px">meat for the dogs</span><b>' + (dogs2.length ? (meatStock / (dogs2.length * 1.05)).toFixed(0) + ' wks' : '&mdash;') + '</b></div>';
+      '<div class="pw"><span style="width:118px">meat for the dogs</span><b>' + (() => {
+        if (!dogs2.length) return '&mdash;';
+        const drain = dogs2.length * 0.5 - Math.min(dogs2.length * 0.62, 2.2);
+        return drain <= 0.05 ? 'the pack feeds itself' : (meatStock / drain).toFixed(0) + ' wks';
+      })() + '</b></div>';
   }
   drawChart(chFood, [{ data: hist.real, color: C.cold }, { data: hist.ann, color: C.redHi }], 1.6);
   drawChart(chMood, [{ data: hist.loyal, color: C.boneDim }, { data: hist.diss, color: C.redHi }, { data: hist.fear, color: C.cold }], 1);
