@@ -2,6 +2,8 @@
 
 **A political-systems & ecosystem simulator, after George Orwell.**
 
+### ▶ [Play it now](https://gameowermedia.github.io/FOLWARK/)
+
 The humans are gone. The farm belongs to the animals — and, quietly, to you. You are
 the unseen hand: you choose whose kind holds the farmhouse, you pull the levers of
 propaganda, repression, privilege and elections, you decide who eats, who builds, and —
@@ -14,8 +16,11 @@ Two histories are written as you play: **the Journal** (what actually happened) 
 
 ## Play
 
+Play in your browser: **https://gameowermedia.github.io/FOLWARK/**
+
 FOLWARK is a single, fully self-contained HTML file. No build step, no dependencies, no
-network — all art is inlined as data URIs.
+network — all art is inlined as data URIs, so you can also just download `index.html` and
+open it:
 
 ```
 # just open it
