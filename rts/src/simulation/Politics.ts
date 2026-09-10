@@ -23,45 +23,29 @@ export function rationCost(animal: AnimalState, politics: PoliticsState): number
   return isPrivileged(animal) ? 1.25 : 0.7;
 }
 
-export function applyPoliticalPressure(
-  animal: AnimalState,
-  politics: PoliticsState,
-  deltaSeconds: number,
-): void {
+export function applyPoliticalPressure(animal: AnimalState, politics: PoliticsState, deltaSeconds: number): void {
   const hungerPressure = Math.max(0, animal.hunger - 0.5);
   const fatiguePressure = Math.max(0, animal.fatigue - 0.65);
   const deprivedByPolicy = politics.rationPolicy === 'privileged' && !isPrivileged(animal) ? 1 : 0;
   const privilegedBenefit = politics.rationPolicy === 'privileged' && isPrivileged(animal) ? 1 : 0;
+  const recovery = animal.hunger < 0.35 && animal.fatigue < 0.45 ? 1 : 0;
 
   animal.grievance = clamp01(
-    animal.grievance +
-      hungerPressure * 0.018 * deltaSeconds +
-      fatiguePressure * 0.012 * deltaSeconds +
-      deprivedByPolicy * 0.004 * deltaSeconds -
-      privilegedBenefit * 0.002 * deltaSeconds,
+    animal.grievance + hungerPressure * 0.018 * deltaSeconds + fatiguePressure * 0.012 * deltaSeconds +
+    deprivedByPolicy * 0.004 * deltaSeconds - privilegedBenefit * 0.002 * deltaSeconds - recovery * 0.003 * deltaSeconds,
   );
 
   animal.loyalty = clamp01(
-    animal.loyalty -
-      hungerPressure * 0.012 * deltaSeconds -
-      fatiguePressure * 0.006 * deltaSeconds -
-      deprivedByPolicy * 0.0025 * deltaSeconds +
-      privilegedBenefit * 0.0015 * deltaSeconds,
+    animal.loyalty - hungerPressure * 0.012 * deltaSeconds - fatiguePressure * 0.006 * deltaSeconds -
+    deprivedByPolicy * 0.0025 * deltaSeconds + privilegedBenefit * 0.0015 * deltaSeconds + recovery * 0.001 * deltaSeconds,
   );
 
-  if (animal.hunger > 0.92) {
-    animal.health = clamp01(animal.health - 0.018 * deltaSeconds);
-  } else if (animal.hunger < 0.35 && animal.fatigue < 0.5) {
-    animal.health = clamp01(animal.health + 0.003 * deltaSeconds);
-  }
+  if (animal.hunger > 0.92) animal.health = clamp01(animal.health - 0.018 * deltaSeconds);
+  else if (recovery) animal.health = clamp01(animal.health + 0.003 * deltaSeconds);
 }
 
 export function updateUnrest(animals: AnimalState[], politics: PoliticsState): void {
-  if (!animals.length) {
-    politics.unrest = 0;
-    return;
-  }
-
+  if (!animals.length) return void (politics.unrest = 0);
   politics.unrest = animals.reduce((sum, a) => {
     const courageFactor = 0.55 + a.courage * 0.45;
     const fearSuppression = 1 - a.fear * 0.65;
