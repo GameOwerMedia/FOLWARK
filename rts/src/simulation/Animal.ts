@@ -1,4 +1,5 @@
 export type Species = 'pig' | 'dog' | 'horse' | 'cow' | 'sheep' | 'hen';
+export type AnimalTask = 'idle' | 'moving' | 'harvest';
 
 export interface AnimalState {
   id: string;
@@ -16,6 +17,7 @@ export interface AnimalState {
   ambition: number;
   voice: number;
   fatigue: number;
+  task: AnimalTask;
   x: number;
   y: number;
 }
@@ -33,6 +35,7 @@ export const createAnimal = (input: Partial<AnimalState> & Pick<AnimalState, 'id
   ambition: 0.4,
   voice: 0.4,
   fatigue: 0,
+  task: 'idle',
   x: 0,
   y: 0,
   ...input,
