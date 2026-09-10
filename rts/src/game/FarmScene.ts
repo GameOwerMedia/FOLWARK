@@ -1,12 +1,20 @@
 import Phaser from 'phaser';
 import { AnimalState, createAnimal } from '../simulation/Animal';
-import { createEconomy, harvestGrain, idleRecovery } from '../simulation/Economy';
+import {
+  createEconomy,
+  depositGrain,
+  eatFromStore,
+  harvestToInventory,
+  idleRecovery,
+  rest,
+} from '../simulation/Economy';
 
 type Unit = {
   state: AnimalState;
   body: Phaser.GameObjects.Container;
   ring: Phaser.GameObjects.Arc;
   status: Phaser.GameObjects.Text;
+  assignedHarvest: boolean;
 };
 
 export class FarmScene extends Phaser.Scene {
@@ -17,6 +25,8 @@ export class FarmScene extends Phaser.Scene {
   private fieldText!: Phaser.GameObjects.Text;
   private infoText!: Phaser.GameObjects.Text;
   private wheatZone = new Phaser.Geom.Rectangle(70, 80, 330, 210);
+  private barnZone = new Phaser.Geom.Rectangle(500, 120, 110, 100);
+  private restZone = new Phaser.Geom.Rectangle(500, 360, 150, 100);
 
   constructor() {
     super('FarmScene');
@@ -44,13 +54,41 @@ export class FarmScene extends Phaser.Scene {
     const dt = Math.min(deltaMs / 1000, 0.1);
 
     for (const unit of this.units) {
-      if (unit.state.task === 'harvest') harvestGrain(unit.state, this.economy, dt);
-      else idleRecovery(unit.state, dt);
-      unit.status.setText(this.statusLine(unit.state));
+      const a = unit.state;
+
+      if (a.task === 'harvest') {
+        harvestToInventory(a, this.economy, dt);
+
+        if (a.carriedGrain >= a.carryCapacity - 0.01 || this.economy.fieldGrain <= 0) {
+          this.sendToBarn(unit);
+        } else if (a.hunger >= 0.82) {
+          this.sendToBarn(unit, 'eat');
+        } else if (a.fatigue >= 0.88) {
+          this.sendToRest(unit);
+        }
+      } else if (a.task === 'eating') {
+        eatFromStore(a, this.economy, dt);
+        if (a.hunger <= 0.18 || this.economy.grain <= 0) {
+          if (a.fatigue >= 0.7) this.sendToRest(unit);
+          else if (unit.assignedHarvest && this.economy.fieldGrain > 0) this.sendToField(unit);
+          else a.task = 'idle';
+        }
+      } else if (a.task === 'resting') {
+        rest(a, dt);
+        if (a.fatigue <= 0.2) {
+          if (a.hunger >= 0.55 && this.economy.grain > 0) this.sendToBarn(unit, 'eat');
+          else if (unit.assignedHarvest && this.economy.fieldGrain > 0) this.sendToField(unit);
+          else a.task = 'idle';
+        }
+      } else {
+        idleRecovery(a, dt);
+      }
+
+      unit.status.setText(this.statusLine(a));
     }
 
-    this.grainText.setText(`GRAIN STORE: ${this.economy.grain.toFixed(1)}`);
-    this.fieldText.setText(`FIELD: ${this.economy.fieldGrain.toFixed(1)}`);
+    this.grainText.setText(`BARN GRAIN: ${this.economy.grain.toFixed(1)}`);
+    this.fieldText.setText(`FIELD GRAIN: ${this.economy.fieldGrain.toFixed(1)}`);
     this.refreshSelectionInfo();
   }
 
@@ -58,17 +96,22 @@ export class FarmScene extends Phaser.Scene {
     const g = this.add.graphics();
     g.fillStyle(0x2a321b, 1).fillRect(0, 0, 960, 640);
     g.fillStyle(0x554522, 1).fillRect(this.wheatZone.x, this.wheatZone.y, this.wheatZone.width, this.wheatZone.height);
-    g.fillStyle(0x3e2e1d, 1).fillRect(640, 110, 190, 140);
-    g.fillStyle(0x6a552e, 1).fillRect(660, 130, 150, 100);
+    g.fillStyle(0x4a331f, 1).fillRect(this.barnZone.x, this.barnZone.y, this.barnZone.width, this.barnZone.height);
+    g.fillStyle(0x3e2e1d, 1).fillRect(680, 110, 190, 140);
+    g.fillStyle(0x6a552e, 1).fillRect(700, 130, 150, 100);
     g.fillStyle(0x263b22, 1).fillRect(70, 355, 390, 190);
-    g.fillStyle(0x23384a, 1).fillCircle(760, 450, 65);
+    g.fillStyle(0x2f2b25, 1).fillRect(this.restZone.x, this.restZone.y, this.restZone.width, this.restZone.height);
+    g.fillStyle(0x23384a, 1).fillCircle(790, 450, 65);
 
     this.add.text(95, 94, 'WHEAT FIELD', { color: '#d9c98d', fontSize: '16px' });
-    this.add.text(95, 115, 'Right-click here to order selected animals to harvest', { color: '#c8b887', fontSize: '11px' });
-    this.add.text(675, 148, 'FARMHOUSE', { color: '#e9e3d3', fontSize: '16px' });
+    this.add.text(95, 115, 'Right-click to assign harvest', { color: '#c8b887', fontSize: '11px' });
+    this.add.text(520, 145, 'BARN', { color: '#e9d29b', fontSize: '16px' });
+    this.add.text(509, 166, 'grain / food', { color: '#c5bda8', fontSize: '11px' });
+    this.add.text(715, 148, 'FARMHOUSE', { color: '#e9e3d3', fontSize: '16px' });
     this.add.text(95, 370, 'PASTURE', { color: '#d9c98d', fontSize: '16px' });
-    this.add.text(712, 440, 'WATER', { color: '#d5e1e8', fontSize: '16px' });
-    this.add.text(20, 15, 'FOLWARK RTS — click unit · right-click ground to move · right-click wheat to harvest', {
+    this.add.text(530, 390, 'REST YARD', { color: '#d0c7b6', fontSize: '14px' });
+    this.add.text(742, 440, 'WATER', { color: '#d5e1e8', fontSize: '16px' });
+    this.add.text(20, 15, 'FOLWARK RTS — harvest → carry → barn → eat/rest → return to work', {
       color: '#e9e3d3',
       fontSize: '15px',
     });
@@ -88,9 +131,9 @@ export class FarmScene extends Phaser.Scene {
 
   private spawnDemoAnimals() {
     const demo = [
-      createAnimal({ id: 'boxer', name: 'Boxer', species: 'horse', strength: 0.95, loyalty: 0.9, x: 240, y: 360 }),
-      createAnimal({ id: 'napoleon', name: 'Napoleon', species: 'pig', ambition: 0.95, voice: 0.85, x: 710, y: 285 }),
-      createAnimal({ id: 'bluebell', name: 'Bluebell', species: 'dog', courage: 0.8, loyalty: 0.72, x: 770, y: 300 }),
+      createAnimal({ id: 'boxer', name: 'Boxer', species: 'horse', strength: 0.95, loyalty: 0.9, carryCapacity: 14, x: 240, y: 360 }),
+      createAnimal({ id: 'napoleon', name: 'Napoleon', species: 'pig', ambition: 0.95, voice: 0.85, carryCapacity: 6, x: 710, y: 285 }),
+      createAnimal({ id: 'bluebell', name: 'Bluebell', species: 'dog', courage: 0.8, loyalty: 0.72, carryCapacity: 7, x: 770, y: 300 }),
     ];
 
     for (const state of demo) this.createUnit(state);
@@ -111,9 +154,9 @@ export class FarmScene extends Phaser.Scene {
     const label = this.add.text(0, 20, state.name, { color: '#f2ead6', fontSize: '12px' }).setOrigin(0.5, 0);
     const status = this.add.text(0, 34, this.statusLine(state), { color: '#c5bda8', fontSize: '9px' }).setOrigin(0.5, 0);
     const body = this.add.container(state.x, state.y, [ring, bodyShape, label, status]);
-    body.setSize(42, 48).setInteractive({ useHandCursor: true });
+    body.setSize(50, 50).setInteractive({ useHandCursor: true });
 
-    const unit: Unit = { state, body, ring, status };
+    const unit: Unit = { state, body, ring, status, assignedHarvest: false };
     body.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (pointer.leftButtonDown()) this.selectOnly(unit);
     });
@@ -129,54 +172,73 @@ export class FarmScene extends Phaser.Scene {
 
   private issueMove(x: number, y: number) {
     this.selected.forEach((unit, index) => {
-      unit.state.task = 'moving';
-      this.tweens.killTweensOf(unit.body);
-
-      const offsetX = (index % 3) * 28;
-      const offsetY = Math.floor(index / 3) * 28;
-      const tx = x + offsetX;
-      const ty = y + offsetY;
-
-      this.tweens.add({
-        targets: unit.body,
-        x: tx,
-        y: ty,
-        duration: Math.max(120, Phaser.Math.Distance.Between(unit.body.x, unit.body.y, tx, ty) * 3),
-        ease: 'Linear',
-        onComplete: () => {
-          unit.state.x = tx;
-          unit.state.y = ty;
-          unit.state.task = 'idle';
-        },
-      });
+      unit.assignedHarvest = false;
+      this.moveUnit(unit, x + (index % 3) * 28, y + Math.floor(index / 3) * 28, 'idle');
     });
   }
 
   private issueHarvestOrder() {
-    this.selected.forEach((unit, index) => {
-      this.tweens.killTweensOf(unit.body);
-      unit.state.task = 'moving';
+    this.selected.forEach((unit) => {
+      unit.assignedHarvest = true;
+      this.sendToField(unit);
+    });
+  }
 
-      const tx = this.wheatZone.centerX + ((index % 3) - 1) * 42;
-      const ty = this.wheatZone.centerY + Math.floor(index / 3) * 38;
+  private sendToField(unit: Unit) {
+    if (!unit.assignedHarvest || this.economy.fieldGrain <= 0) {
+      unit.state.task = 'idle';
+      return;
+    }
+    const index = this.units.indexOf(unit);
+    const tx = this.wheatZone.centerX + ((index % 3) - 1) * 50;
+    const ty = this.wheatZone.centerY + Math.floor((index % 6) / 3) * 42;
+    this.moveUnit(unit, tx, ty, 'harvest');
+  }
 
-      this.tweens.add({
-        targets: unit.body,
-        x: tx,
-        y: ty,
-        duration: Math.max(120, Phaser.Math.Distance.Between(unit.body.x, unit.body.y, tx, ty) * 3),
-        ease: 'Linear',
-        onComplete: () => {
-          unit.state.x = tx;
-          unit.state.y = ty;
-          unit.state.task = this.economy.fieldGrain > 0 ? 'harvest' : 'idle';
-        },
-      });
+  private sendToBarn(unit: Unit, purpose: 'deposit' | 'eat' = 'deposit') {
+    unit.state.task = 'hauling';
+    const tx = this.barnZone.centerX;
+    const ty = this.barnZone.centerY;
+    this.moveUnit(unit, tx, ty, purpose === 'eat' ? 'eating' : 'idle', () => {
+      depositGrain(unit.state, this.economy);
+      if (purpose === 'eat' || unit.state.hunger >= 0.72) {
+        unit.state.task = 'eating';
+      } else if (unit.state.fatigue >= 0.82) {
+        this.sendToRest(unit);
+      } else if (unit.assignedHarvest && this.economy.fieldGrain > 0) {
+        this.sendToField(unit);
+      }
+    });
+  }
+
+  private sendToRest(unit: Unit) {
+    const tx = this.restZone.centerX;
+    const ty = this.restZone.centerY;
+    this.moveUnit(unit, tx, ty, 'resting');
+  }
+
+  private moveUnit(unit: Unit, x: number, y: number, onArrivalTask: AnimalState['task'], afterArrival?: () => void) {
+    this.tweens.killTweensOf(unit.body);
+    unit.state.task = unit.state.carriedGrain > 0 ? 'hauling' : 'moving';
+
+    this.tweens.add({
+      targets: unit.body,
+      x,
+      y,
+      duration: Math.max(120, Phaser.Math.Distance.Between(unit.body.x, unit.body.y, x, y) * 3),
+      ease: 'Linear',
+      onComplete: () => {
+        unit.state.x = x;
+        unit.state.y = y;
+        unit.state.task = onArrivalTask;
+        afterArrival?.();
+      },
     });
   }
 
   private statusLine(state: AnimalState) {
-    return `${state.task.toUpperCase()} · H ${Math.round(state.hunger * 100)} · F ${Math.round(state.fatigue * 100)}`;
+    const carry = state.carriedGrain > 0.05 ? ` · G ${state.carriedGrain.toFixed(1)}/${state.carryCapacity}` : '';
+    return `${state.task.toUpperCase()} · H ${Math.round(state.hunger * 100)} · F ${Math.round(state.fatigue * 100)}${carry}`;
   }
 
   private refreshSelectionInfo() {
@@ -187,6 +249,8 @@ export class FarmScene extends Phaser.Scene {
     this.infoText.setText([
       `${a.name.toUpperCase()} · ${a.species}`,
       `Task: ${a.task}`,
+      `Assigned: ${unit.assignedHarvest ? 'harvest' : 'none'}`,
+      `Carrying: ${a.carriedGrain.toFixed(1)} / ${a.carryCapacity}`,
       `Strength: ${Math.round(a.strength * 100)}`,
       `Hunger: ${Math.round(a.hunger * 100)}`,
       `Fatigue: ${Math.round(a.fatigue * 100)}`,
