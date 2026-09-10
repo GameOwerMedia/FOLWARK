@@ -40,9 +40,15 @@ export function depositGrain(animal: AnimalState, economy: EconomyState): number
   return deposited;
 }
 
-export function eatFromStore(animal: AnimalState, economy: EconomyState, deltaSeconds: number): number {
+export function eatFromStore(
+  animal: AnimalState,
+  economy: EconomyState,
+  deltaSeconds: number,
+  rationMultiplier = 1,
+): number {
   if (animal.task !== 'eating' || economy.grain <= 0 || animal.hunger <= 0.08) return 0;
-  const eatRate = animal.species === 'horse' || animal.species === 'cow' ? 0.85 : 0.45;
+  const baseRate = animal.species === 'horse' || animal.species === 'cow' ? 0.85 : 0.45;
+  const eatRate = baseRate * rationMultiplier;
   const consumed = Math.min(economy.grain, eatRate * deltaSeconds);
   economy.grain -= consumed;
   animal.hunger = Math.max(0, animal.hunger - consumed * 0.22);
@@ -56,7 +62,7 @@ export function rest(animal: AnimalState, deltaSeconds: number): void {
 }
 
 export function idleRecovery(animal: AnimalState, deltaSeconds: number): void {
-  if (animal.task !== 'idle') return;
+  if (animal.task !== 'idle' && animal.task !== 'refusing' && animal.task !== 'protesting') return;
   animal.fatigue = Math.max(0, animal.fatigue - 0.01 * deltaSeconds);
   animal.hunger = Math.min(1, animal.hunger + 0.0025 * deltaSeconds);
 }
