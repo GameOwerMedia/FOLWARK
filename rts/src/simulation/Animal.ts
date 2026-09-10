@@ -1,5 +1,5 @@
 export type Species = 'pig' | 'dog' | 'horse' | 'cow' | 'sheep' | 'hen';
-export type AnimalTask = 'idle' | 'moving' | 'harvest' | 'hauling' | 'eating' | 'resting';
+export type AnimalTask = 'idle' | 'moving' | 'harvest' | 'hauling' | 'eating' | 'resting' | 'refusing' | 'protesting';
 
 export interface AnimalState {
   id: string;
