@@ -95,7 +95,7 @@ test('v5 saves migrate without deleting residents, cargo or their existing histo
  s.units[5].job='stone';s.units[5].load=2;s.units[5].resource='stone';
  for(const a of s.units){delete a.forced;delete a.dutyProgress}
  const other=new World();other.restore(s);
- assert.equal(other.units.length,s.units.length);assert.equal(other.units[5].job,null);assert.equal(other.units[5].load,2);assert.deepEqual(other.journal,s.journal);assert.equal(other.resources.milk,0);assert.equal(other.snapshot().version,6);
+ assert.equal(other.units.length,s.units.length);assert.equal(other.units[5].job,null);assert.equal(other.units[5].load,2);assert.deepEqual(other.journal,s.journal);assert.equal(other.resources.milk,0);assert.equal(other.snapshot().version,7);
 });
 test('malformed society, flight and specialisation saves are rejected atomically',()=>{
  const w=quiet(),before=w.snapshot();

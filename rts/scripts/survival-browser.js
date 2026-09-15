@@ -6,7 +6,7 @@ async page => {
  await page.getByRole('button',{name:'Pauza / wznowienie',exact:true}).click();
  const check=async(fn,message)=>{if(!await page.evaluate(fn))throw Error(message)};
  await check(()=>window.folwark.scene.world.scenario==='survival','Wrong initial scenario');
- await check(()=>document.querySelector('.survival-panel').textContent.includes('Przetrwaj 10 dni'),'Missing objective');
+ await check(()=>document.querySelector('.survival-panel').textContent.includes('Pierwszy kryzys trwa 10 dni'),'Missing objective');
  await check(()=>{
   const chapter=document.querySelector('.chapter-header').getBoundingClientRect(),resources=document.querySelector('.resources').getBoundingClientRect(),tools=document.querySelector('.top-tools').getBoundingClientRect(),map=document.querySelector('#world-panel').getBoundingClientRect();
   return chapter.left>=resources.right&&chapter.right<=tools.left&&chapter.bottom<=map.top&&!document.querySelector('#world-panel #toast')&&!window.folwark.scene.atmosphere.light;

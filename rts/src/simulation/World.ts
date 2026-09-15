@@ -1,3 +1,6 @@
+import {createThreats,tickThreats,validThreats,type ThreatState} from './Threats';
+import {calendar,seasonalGrowth} from './Seasons';
+import {pastureSegments,segmentObstacles} from './Pastures';
 import {roles,aptitude,suited,workEfficiency,roleWorkplace,tickDuty} from './Roles';
 import {createSociety,tickSociety,validSociety,mandate,type SocietyState} from './Society';
 import {createDiplomacy,tickDiplomacy,validDiplomacy,onMission,type DiplomacyState} from './Diplomacy';
@@ -19,9 +22,9 @@ export type Resident = AnimalState & {job:Job; target:number|null; path:{x:numbe
 export type Chronicle = {day:number; text:string};
 export type Choice = {label:string; effect:Partial<Record<Resource,number>>; calm?:number;trust?:number;fear?:number;integrity?:number};
 export type Dilemma = {title:string; text:string; choices:Choice[]};
-type Save = {version:6; society:SocietyState; diplomacy:DiplomacyState; region:RegionState; regime:RegimeState; roads:Road[]; laws:Laws; research:Technology[]; scenario:'campaign'|'sandbox'|'survival'; accumulator:number; time:number; economy:ReturnType<typeof createEconomy>; resources:Record<Exclude<Resource,'grain'>,number>; politics:ReturnType<typeof createPolitics>; units:Resident[]; buildings:Building[]; journal:Chronicle[]; built:number; nextId:number; event:Dilemma|null; outcome:string|null};
+type Save = {version:7; threats:ThreatState; society:SocietyState; diplomacy:DiplomacyState; region:RegionState; regime:RegimeState; roads:Road[]; laws:Laws; research:Technology[]; scenario:'campaign'|'sandbox'|'survival'; accumulator:number; time:number; economy:ReturnType<typeof createEconomy>; resources:Record<Exclude<Resource,'grain'>,number>; politics:ReturnType<typeof createPolitics>; units:Resident[]; buildings:Building[]; journal:Chronicle[]; built:number; nextId:number; event:Dilemma|null; outcome:string|null};
 export const buildingDefs: Record<BuildingKind,{name:string; art:string; width:number; cost:Partial<Record<Resource,number>>; description:string}> = {
-  pasture:{name:'Pastwisko',art:'pasture',width:250,cost:{wood:35,grain:10},description:'Wypas krow i owiec. Mleko i welna wymagaja paszy.'},
+  pasture:{name:'Pastwisko',art:'pasture',width:350,cost:{wood:35,grain:10},description:'Wypas krow i owiec. Mleko i welna wymagaja paszy.'},
   house:{name:'Dom mieszkalny',art:'house',width:220,cost:{wood:70,stone:25},description:'+8 miejsc dla mieszkancow'},
   barn:{name:'Stodola',art:'barn',width:245,cost:{wood:80,stone:30},description:'Magazyn i punkt rozladunku'},
   field:{name:'Pole pszenicy',art:'field',width:260,cost:{wood:35,grain:15},description:'Odnawialne zboze. Wymaga pracownika.'},
@@ -50,6 +53,7 @@ export class World {
   time=0;speed=1;paused=false;economy=createEconomy();resources={wood:180,stone:120,gold:80,flour:0,bread:12,tools:0,knowledge:0,milk:8,eggs:6,wool:0,herbs:0};politics=createPolitics();
   units:Resident[]=[];buildings:Building[]=[];journal:Chronicle[]=[];built=0;nextId=100;event:Dilemma|null=null;outcome:string|null=null;
   toast='';toastSerial=0;revision=0;readonly navigation=new Navigation();private accumulator=0;
+  threats=createThreats();
   regime=createRegime();region=createRegion();society=createSociety();diplomacy=createDiplomacy();
   roads:Road[]=[];laws=defaultLaws();research:Technology[]=[];roadRevision=0;
   constructor(public scenario:'campaign'|'sandbox'|'survival'='campaign'){
@@ -75,7 +79,8 @@ export class World {
     this.log('Pierwszy dzien wolnego folwarku. Zapasy na zime sa wspolna sprawa.');
   }
   get day(){return Math.floor((this.time+1e-7)/DAY_SECONDS)+1}
-  get season(){if(this.scenario==='survival')return this.day>=7?'Zima':'Jesien';return ['Jesien','Zima','Wiosna','Lato'][Math.floor((this.day-1)/7)%4]}
+  get calendar(){return calendar(this.time,DAY_SECONDS)}
+  get season(){return this.calendar.season}
   get workRate(){return (mandate(this,'industry')?1.12:1)*({rested:.8,balanced:1,intensive:1.3})[this.laws.work]*(this.time<this.regime.forcedUntil?1.35:1)}
   get workFatigue(){return ({rested:.65,balanced:1,intensive:1.5})[this.laws.work]*(this.time<this.regime.forcedUntil?1.6:1)}
   get capacity(){return 450+this.count('granary')*300+Math.max(0,this.count('barn')-1)*150}
@@ -103,7 +108,7 @@ export class World {
   }
   footprint(b:Pick<Building,'kind'|'x'|'y'>){
     const width=buildingDefs[b.kind].width;
-    return {x:b.x,y:b.y-25,rx:width*.38,ry:width*.16};
+    return {x:b.x,y:b.y-width*.21,rx:width*.43,ry:width*.23};
   }
   blocked(x:number,y:number){return x<45||y<95||x>WIDTH-50||y>HEIGHT-40||inPond(x,y,12)}
   canBuild(kind:BuildingKind,x:number,y:number){
@@ -116,7 +121,7 @@ export class World {
     if(!Number.isFinite(x)||!Number.isFinite(y)||this.blocked(x-rx,y-ry)||this.blocked(x+rx,y)||this.blocked(x,y-ry*2))return false;
     if(this.buildings.some(b=>Math.hypot((b.x-x)/(rx+buildingDefs[b.kind].width*.47),(b.y-y)/(ry+buildingDefs[b.kind].width*.22))<1.2))return false;
     if(decorations.some(d=>d.radius&&Math.hypot((d.x-x)/(rx+d.radius),(d.y-y)/(ry+d.radius*.6))<1.1))return false;
-    return ![...this.living,...this.regime.convoys].some(a=>Math.abs(a.x-x)<rx&&a.y>y-ry*2&&a.y<y+12);
+    return ![...this.living,...this.regime.convoys,...(this.threats.active?.raiders.filter(e=>e.health>0)??[])].some(a=>Math.abs(a.x-x)<rx&&a.y>y-ry*2&&a.y<y+12);
   }
   build(kind:BuildingKind,x:number,y:number){
     if(this.outcome)return false;
@@ -132,7 +137,7 @@ export class World {
     return this.buildings.filter(b=>b.kind===kind&&b.progress>=1).sort((b,c)=>Math.hypot(b.x-a.x,b.y-a.y)-Math.hypot(c.x-a.x,c.y-a.y))[0];
   }
   rebuildGrid(){
-    this.navigation.rebuild(this.buildings.filter(b=>!['field','garden','orchard','lumber','quarry','stage','pasture'].includes(b.kind)).map(b=>this.footprint(b)),this.roads);
+    this.navigation.rebuild([...this.buildings.filter(b=>!['field','garden','orchard','lumber','quarry','stage','pasture'].includes(b.kind)).map(b=>this.footprint(b)),...this.buildings.filter(b=>b.kind==='pasture'&&b.progress>=1).flatMap(b=>segmentObstacles(pastureSegments(b)))],this.roads);
   }
   private walk(a:Resident,x:number,y:number,arrival:AnimalTask){
     const route=a.species==='raven'?[{x:clamp(x,30,WIDTH-30),y:clamp(y,30,HEIGHT-30)}]:this.navigation.route(a,{x,y});
@@ -142,9 +147,15 @@ export class World {
     return true;
   }
   private slot(a:Resident,b:Building,work=false):Point {
-    const i=this.units.indexOf(a);
-    if(work&&['field','garden','orchard','pasture'].includes(b.kind))return {x:b.x+(i%3-1)*35,y:b.y-25-Math.floor(i%6/3)*25};
-    return {x:b.x+((i%5)-2)*25,y:b.y+27+Math.floor(i%10/5)*25};
+    const i=this.units.indexOf(a),inside=work&&['field','garden','orchard','pasture'].includes(b.kind);
+    const candidates=Array.from({length:24},(_,j)=>{
+      const n=(j+i*7)%24;
+      return inside?{x:b.x+(n%5-2)*52,y:b.y-30-Math.floor(n/5)*24}
+        :{x:b.x+(n%6-2.5)*42,y:b.y+35+Math.floor(n/6)*29};
+    }).filter(p=>Math.hypot(p.x-b.x,p.y-b.y)<165&&this.navigation.clearPoint(p,12));
+    const free=candidates.find(p=>!(inside&&a.job==='care'&&Math.hypot(a.x-p.x,a.y-p.y)<35)&&!this.living.some(u=>u.id!==a.id&&
+      [u,u.destination].some(q=>q&&Math.hypot(q.x-p.x,(q.y-p.y)*1.5)<39)));
+    return free??candidates[0]??this.navigation.nearestFree({x:b.x,y:b.y+70})??a;
   }
   private go(a:Resident,kind:BuildingKind,task:AnimalTask){
     if(!a.job&&a.destination&&a.arrival==='idle'&&['eating','resting'].includes(task))a.queue.unshift({...a.destination});
@@ -197,6 +208,8 @@ export class World {
     const p=this.slot(a,b,true);this.walk(a,p.x,p.y,a.job);
   }
   private depositCargo(a:Resident){
+    const fire=this.threats.active;
+    if(fire?.kind==='fire'&&fire.phase==='active'&&fire.buildingId===a.activityTarget)return false;
     const b=this.buildings.find(b=>b.id===a.activityTarget);
     if(!b||b.kind!=='barn'||Math.hypot(a.x-b.x,a.y-b.y)>150){this.go(a,'barn','deposit');return false}
     const delivered=Math.min(a.carriedGrain,Math.max(0,this.capacity-this.economy.grain));
@@ -335,20 +348,25 @@ export class World {
       const p=a.path[0],dx=p.x-a.x,dy=p.y-a.y,d=Math.hypot(dx,dy);
       if(d<.01){a.path.shift();continue}
       const amount=Math.min(remaining,d),nx=a.x+dx/d*amount,ny=a.y+dy/d*amount;
-      if(a.species!=='raven'&&!this.navigation.clearPoint({x:nx,y:ny},5)){if(a.destination)this.walk(a,a.destination.x,a.destination.y,a.arrival);return}
+      if(a.species!=='raven'&&!this.navigation.clearLine(a,{x:nx,y:ny},10)){if(a.destination)this.walk(a,a.destination.x,a.destination.y,a.arrival);return}
       a.x=nx;a.y=ny;a.heading=Math.atan2(dy,dx);a.travel+=amount;remaining-=amount;
       if(amount>=d-.001)a.path.shift();
     }
-    // Gentle local separation prevents residents stacking at work and delivery slots.
-    for(const other of this.living){
-      if(other.id===a.id||a.species==='raven'||other.species==='raven'||onMission(this,other.id))continue;
-      let dx=a.x-other.x,dy=(a.y-other.y)*1.35,d=Math.hypot(dx,dy);
-      if(d>=19)continue;
-      if(d<.01){dx=this.units.indexOf(a)%2?1:-1;dy=.5;d=1}
-      const push=Math.min(1.5,(19-d)*dt*1.6),p={x:a.x+dx/d*push,y:a.y+dy/d*push/1.35};
-      if(this.navigation.clearPoint(p,6)){a.x=p.x;a.y=p.y}
-    }
     if(!a.path.length){a.task=a.arrival;a.destination=null;if(a.queue.length&&a.arrival==='idle'&&!a.job){const p=a.queue.shift()!;this.walk(a,p.x,p.y,'idle')}}
+  }
+  private separateResidents(dt:number){
+    const units=this.living.filter(a=>a.species!=='raven');
+    const radius=(a:Resident)=>['horse','cow','mule','boar'].includes(a.species)?22:['hen','duck','cat'].includes(a.species)?12:18;
+    for(let i=0;i<units.length;i++)for(let j=i+1;j<units.length;j++){
+      const a=units[i],b=units[j];let dx=a.x-b.x,dy=(a.y-b.y)*1.6,d=Math.hypot(dx,dy);
+      const spacing=radius(a)+radius(b);if(d>=spacing)continue;
+      if(d<.001){dx=i%2?1:-1;dy=.3;d=Math.hypot(dx,dy)}
+      const push=Math.min((spacing-d)*.5,dt*45);
+      for(const [u,sign]of [[a,1],[b,-1]] as const){
+        const p={x:u.x+dx/d*push*sign,y:u.y+dy/d*push*sign/1.6};
+        if(this.navigation.clearLine(u,p,10)){u.x=p.x;u.y=p.y}
+      }
+    }
   }
   private step(dt:number){
     const previousDay=this.day;this.time+=dt;
@@ -359,11 +377,11 @@ export class World {
       const effort=Math.min(2.5,workers.reduce((sum,a)=>sum+workEfficiency(a,b.kind)*(1-a.fatigue*.35),0))*this.workRate;
       if(b.progress<1&&effort>0){
         b.progress=Math.min(1,b.progress+dt*effort/(20+buildingDefs[b.kind].width*.04)*(this.research.includes('masonry')?1.3:1));
-        if(b.progress>=1){this.built++;this.revision++;this.log('Ukonczono: '+buildingDefs[b.kind].name+'.');for(const a of workers){a.target=null;a.task='idle'}}
+        if(b.progress>=1){if(b.kind==='pasture'){this.rebuildGrid();this.replan()}this.built++;this.revision++;this.log('Ukonczono: '+buildingDefs[b.kind].name+'.');for(const a of workers){a.target=null;a.task='idle'}}
       }else if(b.progress>=1){
         if(['field','garden','orchard'].includes(b.kind)){
           const water=this.buildings.some(w=>w.kind==='well'&&w.progress>=1&&w.enabled&&Math.hypot(w.x-b.x,w.y-b.y)<280);
-          const season=this.season==='Zima'?.2:this.season==='Wiosna'?1.3:1;
+          const season=seasonalGrowth(this.season);
           b.stock=Math.min(200+(b.level-1)*80,b.stock+dt*.65*season*(water?1.4:1)*(this.research.includes('agronomy')?1.2:1));
         }
         if(b.kind==='lumber'&&this.laws.forest==='sustainable')b.stock=Math.min(900,b.stock+dt*.12);
@@ -416,7 +434,7 @@ export class World {
         continue;
       }
       if(a.forced&&['harvest','wood','stone','build','produce','patrol','guard'].includes(a.task)){a.grievance=clamp(a.grievance+dt*.006);a.health=clamp(a.health-dt*.006);a.fatigue=clamp(a.fatigue+dt*.009)}
-      if(['care','study','govern'].includes(a.task)){const b=this.buildings.find(b=>b.id===a.target);if(!b||!b.enabled||Math.hypot(a.x-b.x,a.y-b.y)>170){this.sendToJob(a);continue}tickDuty(this,a,dt*(a.job==='study'&&mandate(this,'learning')?1.25:1));continue}
+      if(['care','study','govern'].includes(a.task)){const b=this.buildings.find(b=>b.id===a.target);if(!b||!b.enabled||Math.hypot(a.x-b.x,a.y-b.y)>170){this.sendToJob(a);continue}const progress=a.dutyProgress;tickDuty(this,a,dt*(a.job==='study'&&mandate(this,'learning')?1.25:1));if(a.job==='care'&&a.dutyProgress<progress)this.sendToJob(a);continue}
       if(a.task==='build'||a.task==='produce'){
         const b=this.buildings.find(b=>b.id===a.target);
         if(!b||!b.enabled||a.task==='build'&&b.progress>=1){a.task='idle';a.target=null;continue}
@@ -451,6 +469,8 @@ export class World {
         else if(!a.job&&a.queue.length&&a.wait<=0){const p=a.queue.shift()!;this.walk(a,p.x,p.y,'idle')}
       }
     }
+    this.separateResidents(dt);
+    tickThreats(this,dt);
     tickRegime(this,dt);tickRegion(this,dt);tickDiplomacy(this,dt);tickSociety(this);
     this.resources.gold+=dt*({low:.045,normal:.08,high:.16})[this.laws.tax]*this.living.length/12;updateUnrest(this.living,this.politics);
     if(this.living.length<6||this.politics.unrest>.8){this.outcome=this.living.length<6?'Folwark opustoszal':'Rewolucja';this.event=null;this.log('Rada utracila kontrole nad folwarkiem.');return}
@@ -464,11 +484,11 @@ export class World {
     }
   }
   snapshot():Save{
-    return JSON.parse(JSON.stringify({version:6,society:this.society,diplomacy:this.diplomacy,region:this.region,regime:this.regime,roads:this.roads,laws:this.laws,research:this.research,scenario:this.scenario,accumulator:this.accumulator,time:this.time,economy:this.economy,resources:this.resources,politics:this.politics,units:this.units,buildings:this.buildings,journal:this.journal,built:this.built,nextId:this.nextId,event:this.event,outcome:this.outcome}));
+    return JSON.parse(JSON.stringify({version:7,threats:this.threats,society:this.society,diplomacy:this.diplomacy,region:this.region,regime:this.regime,roads:this.roads,laws:this.laws,research:this.research,scenario:this.scenario,accumulator:this.accumulator,time:this.time,economy:this.economy,resources:this.resources,politics:this.politics,units:this.units,buildings:this.buildings,journal:this.journal,built:this.built,nextId:this.nextId,event:this.event,outcome:this.outcome}));
   }
   restore(raw:unknown){
     const s=raw as Save,finite=(v:unknown)=>typeof v==='number'&&Number.isFinite(v);
-    if(!s||![1,2,3,4,5,6].includes(s.version)||!Array.isArray(s.units)||!s.units.length||!Array.isArray(s.buildings)||!s.economy||!s.resources||!s.politics||!finite(s.time)||!finite(s.nextId)||!finite(s.built)||!Array.isArray(s.journal))throw Error('Nieprawidlowy zapis gry.');
+    if(!s||![1,2,3,4,5,6,7].includes(s.version)||!Array.isArray(s.units)||!s.units.length||!Array.isArray(s.buildings)||!s.economy||!s.resources||!s.politics||!finite(s.time)||!finite(s.nextId)||!finite(s.built)||!Array.isArray(s.journal))throw Error('Nieprawidlowy zapis gry.');
     if(s.units.some(a=>!a||!a.id||!Object.hasOwn(speciesNames,a.species)||!finite(a.x)||!finite(a.y)||!finite(a.health)||!finite(a.hunger)||!finite(a.fatigue)||!Array.isArray(a.path)||a.path.some(p=>!finite(p.x)||!finite(p.y))||!Object.keys(taskNames).includes(a.task)))throw Error('Uszkodzone dane mieszkancow.');
     if(s.buildings.some(b=>!b||!Object.hasOwn(buildingDefs,b.kind)||!finite(b.x)||!finite(b.y)||!finite(b.stock)||!finite(b.progress)))throw Error('Uszkodzone dane budynkow.');
     for(const k of ['grain','wood','stone','gold']as Resource[])if(!finite(k==='grain'?s.economy.grain:s.resources[k]))throw Error('Nieprawidlowe zasoby.');
@@ -491,7 +511,9 @@ export class World {
     if(s.version>=4&&(!validRegime(s.regime)||s.regime.convoys.some(c=>c.id<0||c.id>=s.nextId||s.buildings.some(b=>b.id===c.id)||s.roads.some(r=>r.id===c.id))||[...s.regime.deaths,...s.regime.sold].some(id=>!s.units.some(a=>a.id===id&&a.health===0))))throw Error('Uszkodzony zapis rady lub karawan.');
     if(s.version>=5&&(!validRegion(s.region)||s.region.traffic.some(t=>t.id>=s.nextId||s.regime.convoys.some(c=>c.id===t.id))))throw Error('Uszkodzony zapis regionu.');
     if(s.version>=6&&(!validSociety(s.society,s.units)||!validDiplomacy(s.diplomacy,s.units)||s.units.some(a=>typeof a.forced!=='boolean'||!nonnegative(a.dutyProgress)||a.dutyProgress>60||![null,'harvest','wood','stone','build','produce','patrol','guard','care','study','govern'].includes(a.job)||!Object.hasOwn(resourceNames,a.resource)||!nonnegative(a.load))))throw Error('Uszkodzony zapis specjalizacji lub dyplomacji.');
+    if(s.version>=7&&(!validThreats(s.threats)||s.threats.active&&!s.buildings.some(b=>b.id===s.threats.active!.buildingId)))throw Error('Uszkodzony zapis zagrozen.');
     const copy=JSON.parse(JSON.stringify(s))as Save;
+    this.threats=s.version>=7?copy.threats:createThreats(copy.time);
     this.time=copy.time;this.accumulator=copy.accumulator??0;this.economy=copy.economy;this.resources=Object.assign({flour:0,bread:0,tools:0,knowledge:0,milk:0,eggs:0,wool:0,herbs:0},copy.resources);this.politics=copy.politics;
     this.regime=s.version>=4?copy.regime:createRegime();this.region=s.version>=5?copy.region:createRegion();
     this.society=s.version>=6?copy.society:createSociety();this.diplomacy=s.version>=6?copy.diplomacy:createDiplomacy();
@@ -500,7 +522,7 @@ export class World {
     this.units=copy.units.map(a=>({...a,destination:a.destination??a.path.at(-1)??null,activityTarget:a.activityTarget??null,heading:a.heading??0,travel:a.travel??0,wait:a.wait??0,patrolStep:a.patrolStep??0,queue:a.queue??[],patrolCenter:a.patrolCenter??null,autoBuilder:a.autoBuilder??false,forced:a.forced??false,dutyProgress:a.dutyProgress??0}));
     if(s.version<6){this.society.leaderId=this.living.find(a=>a.name==='Napoleon')?.id??this.living[0]?.id??null;this.politics.leaderSpecies=this.living.find(a=>a.id===this.society.leaderId)?.species;for(const a of this.living){a.autoBuilder=a.species==='mule';if(a.job&&!suited(a,a.job,this.buildings.find(b=>b.id===a.target)?.kind)){a.job=null;a.path=[];a.task='idle';a.destination=null;a.target=null}}}
     this.paused=false;this.speed=1;this.revision++;this.rebuildGrid();
-    if((s.version as number)<4){
+    if((s.version as number)<7){
       for(const a of this.living){
         const safe=this.navigation.nearestFree(a);if(safe){a.x=safe.x;a.y=safe.y}
         a.path=[];a.task='idle';a.destination=null;a.activityTarget=null;

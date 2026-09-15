@@ -40,7 +40,7 @@ test('winter can be survived through honest decisions, insulation, trade and hea
   if(w.day>=7&&!traded)traded=sendConvoy(w,'mlyn','trade');
   w.tick(.1);
  }
- assert.ok(traded);assert.equal(w.outcome,'Folwark przetrwal');assert.ok(w.living.length>=8);assert.ok(w.regime.heat>=.4);assert.equal(w.regime.integrity,1);
+ assert.ok(traded);assert.equal(w.outcome,null);assert.ok(w.journal.some(e=>e.text.startsWith('Pierwszy kryzys przetrwany')));assert.ok(w.living.length>=8);assert.ok(w.regime.heat>=.4);assert.equal(w.regime.integrity,1);
 });
 test('propaganda costs once, obeys cooldown, then hunger exposes the lie',()=>{
  const w=new World(),a=w.units[0],loyalty=a.loyalty,gold=w.resources.gold;

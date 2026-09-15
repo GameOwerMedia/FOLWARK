@@ -17,8 +17,8 @@ export const edicts:Record<Edict,{name:string;cost:Partial<Record<Resource,numbe
  force:{name:'Przymusowa zmiana',cost:{grain:20},description:'Do jutra +35% pracy, +60% zmeczenia. Pracujacy traca zdrowie. Mozliwe zgony.'},
  crackdown:{name:'Pokaz sily strazy',cost:{gold:15},description:'+25 strachu, +12 krzywdy, -12 lojalnosci. Bezposrednie obrazenia pracownikow.'},
 };
-export const temperature=(w:World)=>w.scenario==='survival'?(w.day<4?8:w.day<7?0:w.day<9?-12:-24):w.season==='Zima'?-12:8;
-export const fuelPerDay=(w:World,heating:Heating=w.regime.heating)=>({off:0,normal:28,high:48})[heating]*(1+Math.max(0,-temperature(w))/24*1.5)*(w.regime.insulated?.7:1)*(1-w.society.bedding*.1);
+export const temperature=(w:World)=>w.scenario==='survival'&&w.day<=13?(w.day<4?8:w.day<7?0:w.day<9||w.day>=11?-12:-24):({Jesien:8,Zima:-12,Wiosna:12,Lato:24})[w.season];
+export const fuelPerDay=(w:World,heating:Heating=w.regime.heating)=>(temperature(w)>=12?0:({off:0,normal:28,high:48})[heating])*(1+Math.max(0,-temperature(w))/24*1.5)*(w.regime.insulated?.7:1)*(1-w.society.bedding*.1);
 export function bulletin(w:World,text:string){w.regime.official.unshift({day:w.day,text});w.regime.official=w.regime.official.slice(0,60)}
 export function edictReason(w:World,key:Edict){
  if(w.outcome)return 'Rozgrywka zakonczona';
@@ -61,7 +61,7 @@ export function tickRegime(w:World,dt:number){
   const rate=fuelPerDay(w)/DAY_SECONDS;
   const fuel=Math.min(w.resources.wood,rate*dt);w.resources.wood-=fuel;
   const supplied=rate>0&&fuel>=rate*dt-.00001;
-  const target=supplied?(r.heating==='high'?.98:.77)-cold*.52+(r.insulated?.12:0):.35-cold*.3;
+  const target=supplied?(r.heating==='high'?.98:.77)-cold*.52+(r.insulated?.12:0):Math.min(.9,.65+Math.max(0,temperature(w))*.02)-cold*.6;
   r.heat=clamp(r.heat+(target-r.heat)*dt*.1);
   for(const a of w.living)if(r.heat<.4){a.health=clamp(a.health-dt*(.4-r.heat)*.028);a.grievance=clamp(a.grievance+dt*.002)}
  }
@@ -120,9 +120,13 @@ export function dailyRegime(w:World){
  if(w.day===3)w.event={title:'Prawda przy pustym stole',text:'Rada chce oglosic sukces. Pracownicy prosza o wspolny posilek, nie o przemowienie.',choices:[{label:'Wydaj 25 zboza. +8 zaufania.',effect:{grain:-25},trust:.08},{label:'Obiecaj poprawe bez wydawania zapasow. -8 zaufania.',effect:{},trust:-.08,integrity:-.06}]};
  if(w.day===5)w.event={title:'Ciala pamietaja',text:'Dwoje pracownikow zasypia przy pracy. Straz proponuje nazwac to sabotazem.',choices:[{label:'Oplac przerwe i opieke: 15 monet. +8 zaufania.',effect:{gold:-15},trust:.08},{label:'Nazwij ich sabotezystami. +10 strachu, -15 uczciwosci.',effect:{},fear:.1,trust:-.1,integrity:-.15}]};
  if(w.day===7)w.event={title:'Zima przekracza brame',text:'Temperatura spada do -12 stopni. Ocalenie folwarku wymaga opalu i ludzi zdolnych do pracy.',choices:[{label:'Rozdaj dodatkowe racje: 30 zboza. +10 zaufania.',effect:{grain:-30},trust:.1},{label:'Zachowaj zapasy. Nie wszyscy zrozumieja.',effect:{},trust:-.04}]};
- if(w.day>=11){
-  w.event=null;w.outcome=w.living.length>=8&&r.heat>=.4?'Folwark przetrwal':'Cena przetrwania';
-  w.log(w.outcome==='Folwark przetrwal'?(r.integrity>.55?'Zima minela. Zwierzeta zachowaly prawo do wlasnego glosu.':'Zima minela. Folwark ocalal, lecz dawni ciemiezyciele maja nowych nastepcow.'):'Za malo mieszkancow lub ciepla, by utrzymac wspolnote.');
+ if(w.day===11){
+  if(w.living.length<8||r.heat<.4){w.event=null;w.outcome='Cena przetrwania';w.log('Za malo mieszkancow lub ciepla, by utrzymac wspolnote.')}
+  else w.log('Pierwszy kryzys przetrwany. Zima jeszcze trwa; wiosna nadejdzie w dniu 14.');
+ }
+ if(w.calendar.day===1&&w.day>1){
+  const messages={Zima:'Nadeszla zima. Pola nie odrastaja, a kwatery potrzebuja opalu.',Wiosna:'Nadeszla wiosna. Odwilz odslania ziemie; zaczyna sie sezon wzrostu.',Lato:'Nadeszlo lato. Zbiory maja zabezpieczyc nastepna zime.',Jesien:'Nowy rok folwarku. Jesien przynosi ostatnie zbiory przed mrozem.'};
+  w.log(messages[w.season]);
  }
 }
 export const cityOrders={

@@ -7,6 +7,7 @@ import { drawTerrain } from './Terrain';
 import { makeGaits, GAIT_FRAMES } from './Gait';
 import { Frontier } from './Frontier';
 import { Atmosphere } from './Atmosphere';
+import {snowTexture} from './SeasonArt';
 import { RoadLayer } from './RoadLayer';
 import type { RoadKind } from '../simulation/Development';
 import { recipes } from '../simulation/Development';
@@ -27,6 +28,7 @@ export class FarmScene extends Phaser.Scene {
   private ghost!:Phaser.GameObjects.Image; private selectionBox!:Phaser.GameObjects.Graphics;
   private orderMark!:Phaser.GameObjects.Graphics; private clockText!:Phaser.GameObjects.Text;
   private dragStart:{x:number;y:number;wx:number;wy:number}|null=null; private panning=false;
+  private viewCenter={x:870,y:620};
   private keys!:Record<string,Phaser.Input.Keyboard.Key>; private renderClock=0; private autosaveClock=0;
   constructor(){super('FarmScene')}
   preload(){preloadAssets(this)}
@@ -34,7 +36,7 @@ export class FarmScene extends Phaser.Scene {
   private createFarm(){
     for(const[key,f]of Object.entries(frames))this.textures.get(f.sheet).add(key,0,...f.rect);
     this.cameras.main.setBackgroundColor('#414d35');
-    drawTerrain(this);this.drawDecorations();this.frontier=new Frontier(this);makeGaits(this,Object.keys(speciesNames));
+    drawTerrain(this,this.world.season,this.world.buildings);this.drawDecorations();this.frontier=new Frontier(this);makeGaits(this,Object.keys(speciesNames));
     this.roadLayer=new RoadLayer(this);this.atmosphere=new Atmosphere(this);this.preview=this.add.graphics().setDepth(5000);this.effects=this.add.graphics().setDepth(3800);
 
     this.ghost=this.art('field',0,0,210).setDepth(4000).setAlpha(.6).setVisible(false);
@@ -129,8 +131,8 @@ export class FarmScene extends Phaser.Scene {
   private fitCamera(reset:boolean){
     const c=this.cameras.main;c.setBounds(0,0,WIDTH,HEIGHT);
     const minimum=Math.max(this.scale.width/WIDTH,this.scale.height/HEIGHT);
-    if(reset)c.setZoom(Math.max(minimum,Math.min(this.scale.width/1540,this.scale.height/1110))).centerOn(870,620);
-    else c.setZoom(Math.max(minimum,c.zoom));
+    if(reset)c.setZoom(Math.max(minimum,Math.min(this.scale.width/1150,this.scale.height/740))).centerOn(870,620);
+    else {c.setZoom(Math.max(minimum,c.zoom));c.centerOn(this.viewCenter.x,this.viewCenter.y)}
   }
   resetViews(){this.cancelMode();this.roadVersion=-1;this.unitViews.forEach(v=>{v.sprite.destroy();v.label.destroy();v.ring.destroy();v.shadow.destroy()});this.unitViews.clear();this.buildingViews.forEach(v=>v.destroy());this.buildingViews.clear()}
   update(_time:number,delta:number){
@@ -145,12 +147,25 @@ export class FarmScene extends Phaser.Scene {
       if(this.keys.W.isDown||this.keys.UP.isDown)c.scrollY-=step;if(this.keys.S.isDown||this.keys.DOWN.isDown)c.scrollY+=step;
     }
     this.atmosphere.update(this.world,this.reducedMotion);this.frontier.update();
-    for(let i=0;i<this.decoration.length;i++){const key=decorations[i].key;if(['apple','treeOrange','treeWhite','pine','flag','reeds'].includes(key))this.decoration[i].setRotation(Math.sin((this.reducedMotion?0:this.world.time)*1.15+i*2.3)*(key==='flag'?.012:.004))}
+    for(let i=0;i<this.decoration.length;i++){
+      const d=decorations[i],view=this.decoration[i],tree=['apple','pear','treeOrange','treeWhite','treePink','pine'].includes(d.key);
+      if(tree){
+        const season=this.world.season,key=season==='Zima'?'winterTree':season==='Jesien'?'treeOrange':season==='Wiosna'?(i%2?'treeWhite':'treePink'):'apple',f=frames[key];
+        if(view.frame.name!==key)view.setTexture(f.sheet,key).setDisplaySize(d.width,d.width*f.rect[3]/f.rect[2]);
+        view.setTint(season==='Lato'?0xb5d18d:0xffffff);
+      }
+      if(tree||['flag','reeds'].includes(d.key))view.setRotation(Math.sin((this.reducedMotion?0:this.world.time)*1.15+i*2.3)*(d.key==='flag'?.012:.004));
+      if(['flowers','flowersRed','reeds'].includes(d.key))view.setTint(this.world.season==='Zima'?0xd4dfde:0xffffff);
+    }
     this.effects.clear();
     for(const [id,view] of this.buildingViews)if(!this.world.buildings.some(b=>b.id===id)){view.destroy();this.buildingViews.delete(id)}
     for(const b of this.world.buildings){
       let view=this.buildingViews.get(b.id);
       if(!view){view=this.art(buildingDefs[b.kind].art,b.x,b.y,buildingDefs[b.kind].width);this.buildingViews.set(b.id,view)}
+      const baseKey=buildingDefs[b.kind].art,base=frames[baseKey],baseWidth=buildingDefs[b.kind].width;
+      if(!['field','garden','orchard','lumber','pasture'].includes(b.kind)){
+        view.setTexture(this.world.season==='Zima'?snowTexture(this,baseKey):base.sheet,this.world.season==='Zima'?undefined:baseKey).setDisplaySize(baseWidth,baseWidth*base.rect[3]/base.rect[2]);
+      }
       view.setAlpha(b.enabled?1:.55);
       const artFrame=frames[buildingDefs[b.kind].art];
       if(b.progress<1){
@@ -165,11 +180,23 @@ export class FarmScene extends Phaser.Scene {
         if(recipes[b.kind]&&this.world.productionState(b)==='Produkcja')for(let i=0;i<4;i++){const t=(this.world.time*.25+i*.25)%1;this.effects.fillStyle(0xc7ccc0,(1-t)*.32).fillCircle(b.x+Math.sin(t*5)*8,b.y-artFrame.rect[3]/artFrame.rect[2]*buildingDefs[b.kind].width*.78-t*45,3+t*9)}
       }
       if(['field','garden','pasture'].includes(b.kind))view.setDepth(-10);
+      view.setVisible(b.kind!=='pasture');
       if(b.id===this.selectedBuilding)view.setTint(0xffe7ad);else view.clearTint();
+      if(['orchard','lumber'].includes(b.kind)){
+        const key=this.world.season==='Zima'?'winterTree':this.world.season==='Jesien'?'treeOrange':this.world.season==='Wiosna'?'treeWhite':'apple',f=frames[key],width=buildingDefs[b.kind].width;
+        view.setTexture(f.sheet,key).setDisplaySize(width,width*f.rect[3]/f.rect[2]);
+      }
+      if(b.kind==='garden'){
+        const key=this.world.season==='Zima'?'soil':'garden',f=frames[key],width=buildingDefs[b.kind].width;
+        view.setTexture(this.world.season==='Zima'?snowTexture(this,key,true):f.sheet,this.world.season==='Zima'?undefined:key).setDisplaySize(width,width*f.rect[3]/f.rect[2]);
+        if(b.id!==this.selectedBuilding)view.setTint(this.world.season==='Zima'?0xdbe3df:0xffffff);
+      }
       if(b.kind==='field'){
-        const key=b.stock<15?'stubble':'field';
+        const winter=this.world.season==='Zima',spring=this.world.season==='Wiosna';
+        const key=winter||b.stock<15?'stubble':spring?'field2':'field';
         const f=frames[key],w=buildingDefs.field.width;
-        view.setTexture(f.sheet,key).setDisplaySize(w,w*f.rect[3]/f.rect[2]);
+        view.setTexture(winter?snowTexture(this,key,true):f.sheet,winter?undefined:key).setDisplaySize(w,w*f.rect[3]/f.rect[2]*(spring?.8:winter?.55:1));
+        if(b.id!==this.selectedBuilding)view.setTint(winter?0xdce6e1:spring?0x88b553:0xffffff);
       }
     }
     for(const a of this.world.units){
@@ -198,6 +225,7 @@ export class FarmScene extends Phaser.Scene {
       v.label.setPosition(a.x,a.y+8).setDepth(a.y+1000).setVisible(selected||a.task==='protesting'||a.task==='refusing');
       v.label.setText(t(a.task==='protesting'?a.name+' / Protest':a.name));
     }
+    this.viewCenter={x:c.scrollX+c.width/2,y:c.scrollY+c.height/2};
     this.renderClock+=delta;this.autosaveClock+=delta;
     if(this.renderClock>200){this.onChange();this.renderClock=0}
     if(!this.menuOpen&&this.autosaveSeconds>0&&this.autosaveClock>this.autosaveSeconds*1000){try{saveGame(this.world,'auto')}catch{this.world.notify('Nie udalo sie zapisac automatycznie. Wyeksportuj zapis do pliku.')}this.autosaveClock=0}

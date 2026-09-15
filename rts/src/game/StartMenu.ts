@@ -30,7 +30,7 @@ export function attachStartMenu(scene:FarmScene,replace:(w:World)=>void,apply:(p
    const title=({new:'Nowy folwark',saves:'Kroniki i zapisy',options:'Opcje',credits:'O projekcie',confirm:'Potwierdzenie'})[screen];
    body='<div class="menu-page-heading"><button data-menu="main" aria-label="Wstecz" title="Wstecz">'+i('arrow-left')+'</button><h2>'+title+'</h2></div>';
    if(screen==='new')body+='<div class="scenario-list">'+[
-    ['survival','Dziesiec dni do zimy','Mroz, racje, propaganda. Przetrwanie ma swoja cene.'],
+    ['survival','Folwark przez pory roku','Mroz, racje, propaganda. Przetrwanie ma swoja cene.'],
     ['sandbox','Wolny folwark','Gospodarka i pory roku bez koncowej daty.'],
     ['campaign','Pierwsza jesien','Dawna kampania: trzy budynki i 350 zboza.']
    ].map(([id,title,desc])=>'<button data-scenario="'+id+'"><span>'+title+'<small>'+desc+'</small></span>'+i('chevron-right')+'</button>').join('')+'</div>';

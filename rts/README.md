@@ -18,9 +18,9 @@ Szczegoly poprawionej wersji: [POPRAWKI.md](POPRAWKI.md).
 
 ## Cel
 
-Domyslny scenariusz to 10 dni przetrwania na mapie 3600x2400. Folwark jest ogrodzony; dwie bramy lacza go ze szlakami do trzech sasiadow. W srodku pozostaly pojedyncze drzewa sadu, a las rosnie glownie poza plotem.
+Domyslny scenariusz to ciagle przetrwanie na mapie 3600x2400, z pierwszym kryzysem po 10 dniach. Folwark jest ogrodzony; dwie bramy lacza go ze szlakami do trzech sasiadow. W srodku pozostaly pojedyncze drzewa sadu, a las rosnie glownie poza plotem.
 
-O swicie dnia 11 musi zyc co najmniej 8 mieszkancow, a cieplo kwater musi wynosic co najmniej 40%. Mniej niz 6 zywych albo niepokoje powyzej 80% koncza rzady wczesniej. Gra ocenia tez uczciwosc rady, zgony i osoby oddane ludziom.
+O swicie dnia 11 musi zyc co najmniej 8 mieszkancow, a cieplo kwater musi wynosic co najmniej 40%. Mniej niz 6 zywych albo niepokoje powyzej 80% koncza rzady wczesniej. Po udanym pierwszym kryzysie gra nie zatrzymuje sie: nadchodza wiosna, lato i nastepny rok. Kronika zachowuje uczciwosc rady, zgony i osoby oddane ludziom.
 
 To interpretacja politycznego dramatu Folwarku zwierzecego: przetrwanie, propaganda, nierowne racje, przymus i moralne konsekwencje. Nie jest pelna replika Frostpunka ani kompletna adaptacja fabuly ksiazki.
 
@@ -32,7 +32,7 @@ Menu glowne > Nowa gra pozwalaja wrocic do dawnej kampanii 7 dni lub trybu swobo
 ## Zima i wladza
 
 - Ocieplenie kosztuje 60 drewna i 20 kamienia; zmniejsza zuzycie opalu o 30%.
-- Temperatura: +8 C w dniach 1-3, 0 C w dniach 4-6, -12 C w dniach 7-8, -24 C od dnia 9.
+- Temperatura: +8 C w dniach 1-3, 0 C w dniach 4-6, -12 C w dniach 7-8, -24 C w dniach 9-10, -12 C w dniach 11-13. Potem temperatura wynika z powtarzalnego sezonu.
 - Bazowe ogrzewanie zuzywa 28 albo 48 drewna dziennie. Mroz zwieksza te wartosci do 2,5 raza; panel pokazuje aktualny koszt.
 - Przy -24 C potrzebne jest mocne ogrzewanie. Brak opalu obniza cieplo; zimno odbiera zdrowie. Lecznica wymaga ciepla i dostepnego jedzenia.
 - Dzienne racje kosztuja 2 zboza na osobe (1 chleb zastepuje 2 zboza), niezaleznie od indywidualnych przerw na posilki.
@@ -41,6 +41,18 @@ Menu glowne > Nowa gra pozwalaja wrocic do dawnej kampanii 7 dni lub trybu swobo
 - Przymus: +35% pracy, +60% zmeczenia i utrata zdrowia pracujacych przez jeden dzien. Pokaz sily bezposrednio rani pracownikow i pogarsza relacje z Wolnym Mlynem.
 - Cenzura kosztuje 12 monet. Oficjalny biuletyn moze ukrywac smierc jako przeniesienie; rzeczywista Kronika zachowuje nazwisko i decyzje.
 - W dniach 3, 5 i 7 czas zatrzymuja dylematy. Rozkazy przemocy i oddania pracownika wymagaja osobnego potwierdzenia.
+
+## Pory roku, teren i zagrozenia
+
+Rok liczy 28 dni: jesien 1-6, zima 7-13, wiosna 14-20, lato 21-28. Zapis zachowuje dokladny czas i faze zagrozenia. Zima zatrzymuje odrastanie upraw; wiosna przyspiesza wzrost. Podloze, drzewa, pola i staw zmieniaja wyglad, zima pojawiaja sie lod i snieg. W cieplych sezonach ogrzewanie nie zuzywa drewna.
+
+Pozary i najazdy pojawiaja sie naprzemiennie, z 30-sekundowym ostrzezeniem. Pasek alarmu otwiera miejsce zagrozenia i rozkazy w panelu Przetrwanie. Straz musi dotrzec do ognia lub przeciwnika; zapasy awaryjne kosztuja 15 drewna i 10 zboza. Pozar niszczy zboze i blokuje rozladunek. Najezdzcy ida przez brame po zapasy i moga zostac odparci przez straz.
+
+Pastwiska maja odrebne ploty, przechodnia brame i stanowiska wypasu. Ogrodzenie staje sie przeszkoda po zakonczeniu budowy. Zwierzeta zachowuja odstep, a dojscia korzystaja z powiekszonych obrysow budynkow. Zniknela dekoracja pastwiska z wmalowanymi zwierzetami.
+
+Nowe pliki `winter-tree.png` i `fence-timber.png` wygenerowano wbudowanym narzedziem OpenAI do obrazow: zimowy dab bez lisci oraz proste przeslo ze starych drewnianych belek, z przezroczystym tlem. Plot jest skladany w runtime z pionowymi slupami, nie obracany jako plaski obrazek. Pola ponownie wycieto z dostarczonego arkusza `buildings-final.png`, z przezroczystym marginesem.
+
+Weryfikacja: `npm test`, `npm run build`, skrypty Playwright `seasons-browser.js`, `browser-smoke.js` i `asset-loading-browser.js`.
 
 ## Menu i opcje
 

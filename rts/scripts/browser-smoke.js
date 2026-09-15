@@ -28,6 +28,7 @@ async page => {
  await page.getByRole('button',{name:'Rozbudowa',exact:true}).click();
  await page.screenshot({path:'output/playwright/build-menu.png'});
  await page.locator('[data-build="well"]').click();
+ await page.evaluate(()=>window.folwark.scene.cameras.main.centerOn(1100,850));await page.waitForTimeout(100);
  const spot=await page.evaluate(()=>{const c=window.folwark.scene.cameras.main;return{x:(1330-c.worldView.x)*c.zoom,y:(1030-c.worldView.y)*c.zoom}});
  await page.locator('#game canvas').click({position:spot});
  await check(()=>window.folwark.scene.world.buildings.length===14,'Construction placement failed');

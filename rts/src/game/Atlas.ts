@@ -1,7 +1,7 @@
 import prepared from './prepared-atlas.json';
 export type Frame = { sheet: string; rect: [number, number, number, number]; sheetSize?:[number,number] };
 export function assetUrl(sheet:string):string {
-  return (window as unknown as {FOLWARK_ASSETS?:Record<string,string>}).FOLWARK_ASSETS?.[sheet] ?? new URL('./assets/'+sheet+'.png?v=society-6',document.baseURI).href;
+  return (window as unknown as {FOLWARK_ASSETS?:Record<string,string>}).FOLWARK_ASSETS?.[sheet] ?? new URL('./assets/'+sheet+'.png?v=seasons-7',document.baseURI).href;
 }
 export const sheets = ['concept-original','ui-original','resources','animals-original','buildings-original','animals-work','cards-original','buildings-civic','ui-heraldry','animals-special','cards-special','buildings-village','ui-portraits','concept-farm','animals-final','buildings-final','ui-final','cards-final'];
 const f = (sheet: string, ...rect: [number, number, number, number]): Frame => ({ sheet, rect });
@@ -53,7 +53,7 @@ sourceFrames['portrait-donkey'] = f('ui-portraits',262,150,136,131);
 sourceFrames['portrait-mule'] = f('ui-portraits',393,150,136,131);
 sourceFrames['portrait-duck'] = f('ui-portraits',131,150,136,131);
 sourceFrames['portrait-goose'] = f('ui-portraits',0,150,136,131);
-export const frames:Record<string,Frame> = {...sourceFrames,...prepared as unknown as Record<string,Frame>};
+export const frames:Record<string,Frame> = {...sourceFrames,...prepared as unknown as Record<string,Frame>,timber:{sheet:'fence-timber',rect:[0,0,2172,724],sheetSize:[2172,724]},winterTree:{sheet:'winter-tree',rect:[0,0,1226,1283],sheetSize:[1226,1283]}};
 export const textureSheets=[...new Set([...sheets,'terrain-higgsfield','meadow-fine',...Object.values(frames).map(f=>f.sheet)])];
 
 export function atlasStyle(key: string): string {

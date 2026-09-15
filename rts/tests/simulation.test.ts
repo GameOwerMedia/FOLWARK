@@ -87,7 +87,7 @@ test('hunger interrupts rest and both needs recover before work resumes',()=>{
 });
 test('full storage keeps undelivered cargo instead of discarding it',()=>{
  const w=new World();w.order(w.units.map(a=>a.id),'idle');
- const a=w.units[0];a.hunger=.1;a.x=775;a.y=422;a.carriedGrain=18;
+ const a=w.units[0];a.hunger=.1;a.x=720;a.y=430;a.carriedGrain=18;
  w.economy.grain=w.capacity-3;w.assign([a.id],'harvest');
  advance(w,1);assert.equal(w.economy.grain,w.capacity);assert.equal(a.carriedGrain,15);
  advance(w,8);assert.equal(a.carriedGrain,15);assert.equal(w.trade(true),false);

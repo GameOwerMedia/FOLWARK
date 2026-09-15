@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
+import type {Season} from '../simulation/Seasons';
+import type {Building} from '../simulation/World';
 import { WORLD_WIDTH as W, WORLD_HEIGHT as H, pond, roads,decorations } from '../simulation/Landscape';
 
-export function drawTerrain(scene:Phaser.Scene){
+export function drawTerrain(scene:Phaser.Scene,season:Season='Jesien',buildings:Building[]=[]){
   const source=scene.textures.get('terrain-materials').getSourceImage() as HTMLImageElement;
   const canvas=(w=W,h=H)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c};
   const base=canvas(),ctx=base.getContext('2d')!;
@@ -22,6 +24,8 @@ export function drawTerrain(scene:Phaser.Scene){
       t.save();t.translate(x+random()*70,y+random()*70);t.rotate(random()*Math.PI*2);
       t.drawImage(stamp,-192,-192);t.restore();
     }
+    if(i===0){t.globalCompositeOperation='multiply';t.fillStyle=({Jesien:'#b8ad82',Zima:'#dae3dc',Wiosna:'#83ac65',Lato:'#a4b475'})[season];t.fillRect(0,0,1024,1024);t.globalCompositeOperation='source-over';if(season==='Zima'){t.fillStyle='#e1e7e1dc';t.fillRect(0,0,1024,1024)}}
+    if(i===1){t.globalCompositeOperation='multiply';t.fillStyle=season==='Zima'?'#a3b4b4':'#9d8563';t.fillRect(0,0,1024,1024)}
     return ctx.createPattern(tile,'repeat')!;
   });
   ctx.fillStyle=materials[0];ctx.fillRect(0,0,W,H);
@@ -40,6 +44,13 @@ export function drawTerrain(scene:Phaser.Scene){
     }
   });
   layer(materials[1],g=>{
+    for(const b of buildings.filter(b=>!['field','pasture','lumber','quarry','orchard'].includes(b.kind))){
+      const x=b.x,y=b.y+10,r=b.kind==='barn'?165:115;
+      const fade=g.createRadialGradient(x,y,35,x,y,r);fade.addColorStop(0,'#fff');fade.addColorStop(1,'#fff0');
+      g.fillStyle=fade;g.fillRect(x-r,y-r*.6,r*2,r*1.3);
+    }
+  },2);
+  layer(materials[1],g=>{
     g.fillStyle='#fff';
     for(const path of roads)for(let i=1;i<path.length;i++){
       const a=path[i-1],b=path[i],length=Math.hypot(b[0]-a[0],b[1]-a[1]);
@@ -48,7 +59,7 @@ export function drawTerrain(scene:Phaser.Scene){
         g.beginPath();g.ellipse(a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,r,r*.83,0,0,Math.PI*2);g.fill();
       }
     }
-  },5);
+  },1.5);
   const shore=(g:CanvasRenderingContext2D,margin:number)=>{
     g.beginPath();
     for(let i=0;i<=100;i++){
@@ -60,6 +71,29 @@ export function drawTerrain(scene:Phaser.Scene){
   layer(materials[3],g=>shore(g,19),7);
   layer(materials[1],g=>shore(g,7),3);
   layer(materials[2],g=>shore(g,-3),2);
-  scene.textures.addCanvas('terrain',base);
-  scene.add.image(0,0,'terrain').setName('world-terrain').setOrigin(0).setDepth(-100);
+  ctx.save();
+  ctx.beginPath();ctx.ellipse(pond.x,pond.y,pond.rx-5,pond.ry-5,0,0,Math.PI*2);ctx.clip();
+  const depth=ctx.createLinearGradient(pond.x,pond.y-pond.ry,pond.x,pond.y+pond.ry);
+  depth.addColorStop(0,({Zima:'#d9e6e9ee',Wiosna:'#314439d9',Lato:'#123b41d9',Jesien:'#122c38d9'})[season]);depth.addColorStop(1,({Zima:'#8daebdc9',Wiosna:'#899b7040',Lato:'#438b8140',Jesien:'#547c7e40'})[season]);
+  ctx.fillStyle=depth;ctx.fillRect(pond.x-pond.rx,pond.y-pond.ry,pond.rx*2,pond.ry*2);
+  if(season==='Zima')for(let i=0;i<24;i++){
+    const x=pond.x+(rng()-.5)*pond.rx*2,y=pond.y+(rng()-.5)*pond.ry*2;
+    ctx.strokeStyle='#edf4f4aa';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+22,y-8);ctx.lineTo(x+47,y-4);ctx.stroke();
+  }
+  ctx.restore();
+  // Cart ruts follow the same road polylines used by navigation.
+  ctx.strokeStyle=season==='Zima'?'#63767544':'#3f392944';ctx.lineWidth=1.4;
+  for(const path of roads)for(const offset of [-8,8]){
+    ctx.beginPath();path.forEach(([x,y],i)=>i?ctx.lineTo(x+offset,y):ctx.moveTo(x+offset,y));ctx.stroke();
+  }
+  if(season==='Zima'){
+    ctx.fillStyle='#e4ebe554';ctx.fillRect(0,0,W,H);
+  }
+  const existing=scene.textures.get('terrain');
+  if(scene.textures.exists('terrain')){
+    const target=existing.getSourceImage() as HTMLCanvasElement;target.getContext('2d')!.drawImage(base,0,0);(existing as Phaser.Textures.CanvasTexture).refresh();
+  }else{
+    scene.textures.addCanvas('terrain',base);
+    scene.add.image(0,0,'terrain').setName('world-terrain').setOrigin(0).setDepth(-100);
+  }
 }

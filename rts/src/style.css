@@ -66,6 +66,11 @@ select{min-width:0;max-width:100%;background:#1b241b;color:#d8dec9;border:1px so
 #loading span,#loading small{max-width:520px;overflow-wrap:anywhere;line-height:1.6}
 #loading button{min-height:44px;padding:12px 24px;font:14px Manrope,Arial,sans-serif}
 
+.crisis-bar>button{width:29px;height:29px;flex:none;display:grid;place-items:center;border-color:#cb775a;color:#f0b8a1}
+.threat-panel{border-bottom:1px solid #9f5d46;padding-bottom:14px;margin-bottom:18px;color:#ecc1a5}
+.threat-panel p{font-size:11px;line-height:1.6;margin:8px 0}
+.threat-panel>strong{font-size:11px}
+
 /* The generated title plate is full-bleed; commands remain real, localized controls. */
 #start-menu{background-image:var(--menu-keyart);background-size:cover;background-position:left center;background-color:#10191d}
 #start-menu .menu-vignette{background:#06100d30}
@@ -208,7 +213,7 @@ select{min-width:0;max-width:100%;background:#1b241b;color:#d8dec9;border:1px so
 .recruit>div{flex-wrap:wrap}.election-panel svg,.embassy-panel svg,.role-panel svg{width:18px;height:18px;flex-shrink:0}
 
 @media(max-width:700px) and (min-height:650px){
- .play-layout:has(.side-tabs button:not([data-tab="unit"]).active){grid-template-rows:120px minmax(0,1fr)}
+ .play-layout:has(.side-tabs button:not([data-tab="unit"]).active){grid-template-rows:minmax(140px,1.25fr) minmax(120px,1fr)}
  .play-layout:has(.side-tabs button:not([data-tab="unit"]).active) .map-tools{flex-direction:row}
  .play-layout:has(.side-tabs button:not([data-tab="unit"]).active) .minimap-wrap{display:none}
 }

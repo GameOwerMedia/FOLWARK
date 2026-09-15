@@ -1,3 +1,4 @@
+import {seasonPhrases} from './seasons';
 import {societyPhrases} from './society';
 import {menuPhrases} from './menu';
 import {economyPhrases} from './economy';
@@ -13,7 +14,7 @@ export function setLanguage(value:Language){
   document.title=value==='en'?'FOLWARK | Survival and power':'FOLWARK | Przetrwanie i wladza';
  }
 }
-export const catalog:Record<string,string>=Object.fromEntries([menuPhrases,economyPhrases,regimePhrases,societyPhrases].flatMap(part=>part.trim().split('\n').map(line=>line.split('|'))));
+export const catalog:Record<string,string>=Object.fromEntries([menuPhrases,economyPhrases,regimePhrases,societyPhrases,seasonPhrases].flatMap(part=>part.trim().split('\n').filter(line=>line.trim()).map(line=>line.split('|'))));
 const variants=new Map<string,string>();
 for(const [pl,en]of Object.entries(catalog)){
  variants.set(pl.toLowerCase(),en.toLowerCase());

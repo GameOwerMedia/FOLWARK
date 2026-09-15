@@ -1,3 +1,5 @@
+import {threatPanel} from './ThreatPanel';
+import {respondToThreat,emergencySupplies} from '../simulation/Threats';
 import {rolePanel,electionPanel,embassyPanel} from './SocietyPanel';
 import {roles,suited} from '../simulation/Roles';
 import {nominate,campaign,elect,type Platform} from '../simulation/Society';
@@ -35,7 +37,7 @@ export function attachUI(scene:FarmScene){
         <div class="speed-controls">${button('pause','Pauza / wznowienie','pause')}<button data-speed="1" class="active" title="Normalne tempo">1x</button><button data-speed="2" title="Podwojne tempo">2x</button><button data-speed="4" title="Czterokrotne tempo">4x</button></div>
         ${button('main-menu','Menu glowne','menu')}${button('saves','Zapisy gry','folder-open')}${button('save','Zapisz gre','save')}${button('settings','Opcje gry','settings-2')}
       </div>
-    </header><section class="crisis-bar" aria-label="Stan przetrwania"><strong id="crisis-objective"></strong><span id="crisis-heat"></span><span id="crisis-deadline"></span></section>
+    </header><section class="crisis-bar" aria-label="Stan przetrwania"><strong id="crisis-objective"></strong>${button('threat-focus','Pokaz zagrozenie','triangle-alert','id="threat-alert" hidden')}<span id="crisis-heat"></span><span id="crisis-deadline"></span></section>
     <main class="play-layout">
       <section id="world-panel" aria-label="Mapa folwarku"><div id="game"></div>
         <div class="map-tools">${button('pan','Przesuwanie mapy przez przeciaganie','hand')}${button('center','Wysrodkuj mape','locate-fixed')}${button('zoom-in','Przybliz','plus')}${button('zoom-out','Oddal','minus')}${button('fullscreen','Pelny ekran','maximize')}</div>
@@ -104,6 +106,9 @@ export function attachUI(scene:FarmScene){
     if(target.dataset.recruit)scene.world.recruit(target.dataset.recruit as Species);
     if(target.dataset.art)showModal('art-'+target.dataset.art,`<div class="dialog-header"><h2>Archiwum folwarku</h2>${button('library','Powrot do ksiegi','arrow-left')}${button('close','Zamknij','x')}</div><img class="full-art" src="${assetUrl(target.dataset.art)}" alt="${target.dataset.art}">`);
     switch(action){
+      case 'threat-focus':{const t=scene.world.threats.active;if(t){scene.cameras.main.centerOn(t.x,t.y);activeTab='mission'}break}
+      case 'threat-respond':respondToThreat(scene.world);break;
+      case 'threat-supplies':emergencySupplies(scene.world);break;
       case 'confirm-force-role':if(forcedOrder){scene.world.assign([forcedOrder.id],forcedOrder.job,undefined,true);forcedOrder=null}closeModal();break;
       case 'election':elect(scene.world);break;
       case 'wool-bedding':if(scene.world.society.bedding<3&&scene.world.canPay({wool:12})){scene.world.pay({wool:12});scene.world.society.bedding++;scene.world.notify('Welna ocieplila poslania. Zuzycie opalu spadlo o 10%.')}break;
@@ -135,7 +140,7 @@ export function attachUI(scene:FarmScene){
       case 'settings':options();break;case 'close':case 'resume':closeModal();break;
       case 'sound':sound=!sound;if(sound)beep();modalKey='';options();break;
       case 'feast':scene.world.feast();break;case 'buy':scene.world.trade(true);break;case 'sell':scene.world.trade(false);break;
-      case 'restart-confirm':showModal('restart',`<div class="dialog-header"><h2>Nowy folwark?</h2>${button('close','Anuluj','x')}</div><p>Obecna rozgrywka zostanie zakonczona. Reczny zapis gry pozostanie dostepny.</p><div class="dialog-actions"><button data-action="close">Anuluj</button><button data-action="restart">Dawna kampania: 7 dni</button><button class="primary" data-action="restart-survival">Przetrwanie: 10 dni</button><button class="primary" data-action="restart-sandbox">Tryb swobodny</button></div>`);break;
+      case 'restart-confirm':showModal('restart',`<div class="dialog-header"><h2>Nowy folwark?</h2>${button('close','Anuluj','x')}</div><p>Obecna rozgrywka zostanie zakonczona. Reczny zapis gry pozostanie dostepny.</p><div class="dialog-actions"><button data-action="close">Anuluj</button><button data-action="restart">Dawna kampania: 7 dni</button><button class="primary" data-action="restart-survival">Przetrwanie: kolejne pory roku</button><button class="primary" data-action="restart-sandbox">Tryb swobodny</button></div>`);break;
       case 'restart':case 'restart-sandbox':case 'restart-survival':scene.world=new World(action==='restart'?'campaign':action==='restart-survival'?'survival':'sandbox');scene.resetViews();scene.selected=['unit-100'];scene.selectedBuilding=null;scene.mode='select';lastRoster='';activeTab='mission';closeModal();break;
       case 'library':
         showModal('library',`<div class="dialog-header"><div><span class="chapter">ARCHIWUM WIZUALNE</span><h2>Ksiega folwarku</h2></div>${button('close','Zamknij ksiege','x')}</div><div class="gallery">${sheets.map((s,i)=>`<button data-art="${s}"><img src="${assetUrl(s)}" alt="${s}" loading="lazy"><span>${String(i+1).padStart(2,'0')} / ${s.replaceAll('-',' ')}</span></button>`).join('')}</div>`);break;
@@ -151,11 +156,11 @@ export function attachUI(scene:FarmScene){
   function render(){
     const w=scene.world;
     const ch=chapter(w);el('chapter-label').textContent='ROZDZIAL '+ch[0];el('chapter-title').textContent=ch[1];
-    el('crisis-objective').textContent=nextObjective(w);el('crisis-heat').textContent=w.scenario==='survival'?temperature(w)+' C / Cieplo '+Math.round(w.regime.heat*100)+'%':'';el('crisis-deadline').textContent=w.scenario==='survival'?'Dzien '+w.day+' / 10':'Dzien '+w.day;
-    el('season-label').textContent=w.season.toUpperCase();
+    el('threat-alert').hidden=!w.threats.active;el('crisis-objective').textContent=w.threats.active?(w.threats.active.kind==='fire'?'Pozar stodoly':'Najazd na folwark')+' / '+Math.max(0,Math.ceil(w.threats.active.deadline-w.time))+' s':nextObjective(w);el('crisis-heat').textContent=w.scenario==='survival'?temperature(w)+' C / Cieplo '+Math.round(w.regime.heat*100)+'%':'';el('crisis-deadline').textContent=w.scenario==='survival'?'Dzien '+w.day+(w.day<=10?' / 10':''):'Dzien '+w.day;
+    el('season-label').textContent=w.season.toUpperCase()+' / '+w.calendar.day+' / '+w.calendar.days;
     for(const k of ['grain','wood','stone','gold','bread','tools'] as Resource[])el('res-'+k).textContent=Math.floor(w.get(k)).toLocaleString(locale());
     el('res-grain').parentElement!.parentElement!.title='Zboze: '+Math.floor(w.economy.grain)+' / '+w.capacity;
-    el('day-label').textContent='Dzien '+w.day+(w.scenario==='campaign'?' / 7':'');
+    el('day-label').textContent='Rok '+w.calendar.year+' / Dzien '+w.day;
     el('scenario-label').textContent=w.scenario==='survival'?'PRZETRWANIE I WLADZA':w.scenario==='campaign'?'SIEDEM DNI DO ZIMY':'WOLNY FOLWARK';
     const hour=Math.floor((w.time%DAY_SECONDS)/DAY_SECONDS*24);
     el('day-clock').textContent=innerWidth<=700?'Dzien '+w.day:String(hour).padStart(2,'0')+':00';
@@ -192,6 +197,7 @@ export function attachUI(scene:FarmScene){
     }else if(activeTab==='mission'){html=`<div class="mission-summary"><span class="eyebrow">${w.scenario==='campaign'?'SIEDEM DNI DO ZIMY':'ROZWOJ WSPOLNOTY'}</span><h2>Wspolna przyszlosc</h2><p>${w.season} / Dzien ${w.day}</p><div class="mission-goals">${el('goals').innerHTML}</div><p>${w.scenario==='campaign'?'O swicie dnia 8: 350 zboza, trzy nowe budynki i niepokoje ponizej 35%.':'Tryb swobodny. Wspolnota rozwija sie bez koncowej daty. Zima ogranicza odrost plonow.'}</p><div class="mission-unrest">Niepokoje: ${unrest}% / Mieszkancy: ${w.living.length}</div></div>`;
     }else html=`<div class="journal"><span class="eyebrow">PAMIETAMY</span><h2>Kronika folwarku</h2>${w.journal.map(entry=>`<article><span>DZIEN ${entry.day}</span><p>${escapeHtml(entry.text)}</p></article>`).join('')}</div>`;
     const context=activeTab+(activeTab==='unit'?(scene.selected[0]??scene.selectedBuilding??''):'');
+    if(activeTab==='mission')html=threatPanel(w)+html;
     if(html!==sidebarSignature&&document.activeElement?.tagName!=='SELECT'){el('inspector').innerHTML=html;sidebarSignature=html}
     if(context!==inspectorContext){document.querySelector('.sidebar')!.scrollTop=0;inspectorContext=context}
     el('build-tray').hidden=!tray;

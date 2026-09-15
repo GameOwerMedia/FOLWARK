@@ -11,7 +11,7 @@ const selections:Record<string,[string,number]> = {
  stage:['buildings-final',11],barracks:['buildings-final',12],kennel:['buildings-final',14],market:['buildings-final',13],
  bees:['buildings-final',23],garden:['buildings-final',21],vegetables:['buildings-final',19],
  apple:['buildings-final',16],pear:['buildings-final',17],treeWhite:['buildings-final',22],treePink:['buildings-final',24],treeOrange:['buildings-final',20],pine:['buildings-final',18],
- field:['buildings-original',22],field2:['buildings-original',23],fieldFence:['buildings-final',30],stubble:['buildings-original',29],soil:['buildings-original',29],
+ field:['buildings-final',28],field2:['buildings-final',29],fieldFence:['buildings-final',30],stubble:['buildings-original',29],soil:['buildings-original',29],
  well:['buildings-original',125],crates:['buildings-original',109],barrels:['buildings-original',112],logs:['buildings-original',138],
  fence:['buildings-final',54],fence2:['buildings-final',57],wall:['buildings-original',79],bridge:['buildings-final',49],
  pond:['buildings-original',204],pond2:['buildings-original',189],reeds:['buildings-original',214],dock:['buildings-final',61],
@@ -76,4 +76,3 @@ for(let i=0;i<sprites.length;i++){
 }
 await sharp({create:{width:1280,height:Math.ceil(sprites.length/8)*160,channels:4,background:'#40473d'}}).composite(tiles).jpeg({quality:90}).toFile('output/atlas/sprite-review.jpg');
 console.log(JSON.stringify({sprites:sprites.length,width,height,sourceClipped:report.filter(x=>x.sourceClipped)},null,2));
-

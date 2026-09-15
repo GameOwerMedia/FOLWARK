@@ -12,7 +12,7 @@ export class Navigation {
   this.roads=roads;
   this.obstacles=[...buildings,...fenceObstacles,...neighborObstacles,...decorations.filter(d=>d.radius).map(d=>({x:d.x,y:d.y-8,rx:d.radius!,ry:d.radius!*.58}))];
   this.grid=Array.from({length:WORLD_HEIGHT/this.cell},(_,y)=>Array.from({length:WORLD_WIDTH/this.cell},(_,x)=>{
-   const p={x:x*this.cell+10,y:y*this.cell+10};return this.clearPoint(p,9)?this.speedAt(p)>1.5?3:this.speedAt(p)>1?2:0:1;
+   const p={x:x*this.cell+10,y:y*this.cell+10};return this.clearPoint(p,12)?this.speedAt(p)>1.5?3:this.speedAt(p)>1?2:0:1;
   }));
   this.finder.setGrid(this.grid);this.finder.setAcceptableTiles([0,2,3]);this.finder.setTileCost(0,1.65);this.finder.setTileCost(2,1.65/1.3);this.finder.setTileCost(3,1);
   this.finder.enableDiagonals();this.finder.disableCornerCutting();this.finder.enableSync();
@@ -21,7 +21,7 @@ export class Navigation {
   if(p.x<30+margin||p.y<80+margin||p.x>WORLD_WIDTH-30-margin||p.y>WORLD_HEIGHT-30-margin||inPond(p.x,p.y,margin))return false;
   return !this.obstacles.some(b=>((p.x-b.x)/(b.rx+margin))**2+((p.y-b.y)/(b.ry+margin))**2<1);
  }
- clearLine(a:Point,b:Point,margin=8){
+ clearLine(a:Point,b:Point,margin=12){
   const steps=Math.ceil(Math.hypot(b.x-a.x,b.y-a.y)/5);
   for(let i=1;i<=steps;i++)if(!this.clearPoint({x:a.x+(b.x-a.x)*i/steps,y:a.y+(b.y-a.y)*i/steps},margin))return false;
   return true;

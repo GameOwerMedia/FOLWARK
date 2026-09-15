@@ -23,7 +23,7 @@ const props:[string,number,number,number,number?][]=[
  ['apple',200,605,135,22],['apple',240,720,140,22],['treeOrange',145,815,120,18],
 
 
- ['fence',310,580,140,35],['fence2',530,725,145,35],
+
  ['lamp',880,520,38,5],['lamp',1215,575,38,5],
  ['barrels',950,445,75,22],['crates',680,380,80,24],['flag',1230,450,42],
  ['flowers',980,465,65],['flowersRed',1210,680,65],['flowers',895,815,65],
