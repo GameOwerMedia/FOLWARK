@@ -3,8 +3,8 @@ export type RoadKind='dirt'|'stone';
 export type Road={id:number;kind:RoadKind;points:number[][];cost:Partial<Record<Resource,number>>};
 export type Laws={work:'rested'|'balanced'|'intensive';tax:'low'|'normal'|'high';food:'saving'|'normal'|'generous';forest:'sustainable'|'intensive'};
 export const defaultLaws=():Laws=>({work:'balanced',tax:'normal',food:'normal',forest:'sustainable'});
-export const resourceNames:Record<Resource,string>={grain:'Zboze',wood:'Drewno',stone:'Kamien',gold:'Monety',flour:'Maka',bread:'Chleb',tools:'Narzedzia',knowledge:'Wiedza'};
-export const resourceArt:Record<Resource,string>={grain:'wheat',wood:'wood',stone:'stone',gold:'gold',flour:'flour',bread:'food',tools:'tools',knowledge:'knowledge'};
+export const resourceNames:Record<Resource,string>={grain:'Zboze',wood:'Drewno',stone:'Kamien',gold:'Monety',flour:'Maka',bread:'Chleb',tools:'Narzedzia',knowledge:'Wiedza',milk:'Mleko',eggs:'Jaja',wool:'Welna',herbs:'Ziola'};
+export const resourceArt:Record<Resource,string>={grain:'wheat',wood:'wood',stone:'stone',gold:'gold',flour:'flour',bread:'food',tools:'tools',knowledge:'knowledge',milk:'portrait-cow',eggs:'portrait-hen',wool:'portrait-sheep',herbs:'portrait-goat'};
 export const recipes:Partial<Record<BuildingKind,{input:Partial<Record<Resource,number>>;output:Partial<Record<Resource,number>>;seconds:number}>>={
  mill:{input:{grain:5},output:{flour:4},seconds:8},
  bakery:{input:{flour:4,wood:1},output:{bread:6},seconds:9},

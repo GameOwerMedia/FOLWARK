@@ -44,13 +44,13 @@ test('a mill consumes grain, a bakery consumes flour and wood, and both need sta
  const w=quiet(),mill=ready(w,'mill',2350,900),bakery=ready(w,'bakery',2650,950);
  const originalBread=w.resources.bread;w.economy.grain=100;
  advance(w,15);assert.equal(w.resources.flour,0);assert.equal(mill.production,0);
- const a=w.units[0],b=w.units[1];a.x=2300;a.y=927;b.x=2625;b.y=977;
+ const a=w.units.find(a=>a.species==='mule')!,b=w.units.find(a=>a.species==='pig')!;a.x=2300;a.y=927;b.x=2625;b.y=977;
  w.assign([a.id],'produce',mill.id);w.assign([b.id],'produce',bakery.id);
  advance(w,40);assert.ok(mill.batches>=3);assert.ok(bakery.batches>=2);assert.ok(w.resources.bread>originalBread);assert.ok(w.economy.grain<100);
  assert.equal(w.resources.flour,mill.batches*4-bakery.batches*4);
 });
 test('production stops when input or output capacity is missing',()=>{
- const w=quiet(),mill=ready(w,'mill',2350,900),a=w.units[0];a.x=2300;a.y=927;w.assign([a.id],'produce',mill.id);w.economy.grain=0;
+ const w=quiet(),mill=ready(w,'mill',2350,900),a=w.units.find(a=>a.species==='mule')!;a.x=2300;a.y=927;w.assign([a.id],'produce',mill.id);w.economy.grain=0;
  advance(w,20);assert.equal(mill.batches,0);assert.equal(w.productionState(mill),'Brak skladnikow');
  w.economy.grain=100;w.resources.flour=w.capacity;
  advance(w,20);assert.equal(mill.batches,0);assert.equal(w.productionState(mill),'Magazyn pelny');
@@ -75,7 +75,7 @@ test('research needs a library, costs resources once and benefits new recruits',
  assert.equal(w.researchTech('logistics'),false);ready(w,'library',2350,900);
  const carry=w.units[0].carryCapacity;assert.ok(w.researchTech('logistics'));assert.equal(w.units[0].carryCapacity,carry+8);
  const tools=w.resources.tools;assert.equal(w.researchTech('logistics'),false);assert.equal(w.resources.tools,tools);
- assert.equal(w.addUnit('Test','horse',2500,900).carryCapacity,26);
+ assert.equal(w.addUnit('Test','horse',2500,900).carryCapacity,30);
 });
 test('shift movement queues waypoints and food breaks do not skip recovery',()=>{
  const w=quiet(),a=w.units[0];a.x=950;a.y=850;

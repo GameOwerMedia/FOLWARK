@@ -87,7 +87,7 @@ test('convoys replan when construction obstructs the next segment',()=>{
 test('contract removes the named worker permanently but does not count as a death',()=>{
  const w=new World(),a=w.units[0],gold=w.resources.gold;
  assert.equal(sendConvoy(w,'dwor','contract',w.units.find(a=>a.species==='pig')!.id),false);
- assert.ok(sendConvoy(w,'dwor','contract',a.id));assert.equal(w.living.length,11);assert.equal(a.health,0);
+ assert.ok(sendConvoy(w,'dwor','contract',a.id));assert.equal(w.living.length,21);assert.equal(a.health,0);
  assert.ok(w.regime.sold.includes(a.id));recordDeaths(w);assert.equal(w.regime.deaths.length,0);assert.equal(w.resources.gold,gold);
  dispatchTime(w,150);assert.equal(w.resources.gold,gold+30);assert.ok(w.regime.integrity<.7);
 });

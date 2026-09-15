@@ -1,0 +1,54 @@
+async page=>{
+ const errors=[],failed=[];page.on('pageerror',e=>errors.push(e.message));page.on('response',r=>{if(r.status()>=400&&!r.url().includes('favicon'))failed.push(r.url())});
+ const check=async(fn,msg)=>{if(!await page.evaluate(fn))throw Error(msg)};
+ await page.setViewportSize({width:1440,height:960});await page.goto('http://127.0.0.1:5177/');
+ await page.locator('#loading').waitFor({state:'detached'});await page.locator('[data-menu="options"]').click();await page.locator('[data-pref="language"]').selectOption('en');await page.locator('[data-menu="main"]').click();
+ await page.locator('[data-menu="new"]').click();await page.locator('[data-scenario="sandbox"]').click();
+ await page.evaluate(()=>{window.folwark.scene.world.paused=true;window.folwark.scene.onChange()});
+ await check(()=>window.folwark.scene.world.living.length===22,'Wrong cast');
+ await page.getByRole('button',{name:'Select: Snowball',exact:true}).click();
+ if(!(await page.locator('#inspector').innerText()).includes('Organisation and propaganda'))throw Error('Missing role details');
+ await page.getByRole('button',{name:'Select: Ruda',exact:true}).count().then(async n=>{if(n)await page.getByRole('button',{name:'Select: Ruda',exact:true}).click();else await page.locator('[data-unit="unit-107"]').first().click()});
+ if(!await page.locator('[data-action="stone"]').isDisabled())throw Error('Hen can mine without coercion');
+ await page.locator('#role-job').selectOption('stone');await page.locator('[data-role-assign]').click();
+ if(!(await page.locator('#modal').innerText()).includes('Forced assignment'))throw Error('Missing forced confirmation');
+ await page.locator('[data-action="confirm-force-role"]').click();
+ await check(()=>window.folwark.scene.world.units[7].forced,'Force not applied');
+ await page.locator('[data-natural]').click();await check(()=>!window.folwark.scene.world.units[7].forced&&window.folwark.scene.world.units[7].job==='care','Natural duty failed');
+ await page.locator('[data-tab="council"]').click();
+ if(await page.locator('.candidate').count()!==22)throw Error('Not all animals can run');
+ await page.locator('[data-platform="unit-107"]').selectOption('solidarity');
+ for(let i=0;i<3;i++)await page.locator('[data-campaign="unit-107"]').click();
+ await page.locator('[data-action="election"]').click();
+ await check(()=>window.folwark.scene.world.society.leaderId==='unit-107','Hen election failed');
+ await page.screenshot({path:'output/playwright/election-desktop.png'});
+ await page.getByRole('button',{name:'Select: Moses',exact:true}).click();await page.locator('[data-action="center"]').click();
+ await check(()=>window.folwark.scene.unitViews.get('unit-111').sprite.frame.name==='ravenPerched','Idle raven has flight pose');
+ await page.screenshot({path:'output/playwright/raven-perched.png'});
+ await page.locator('.side-tabs [data-tab="neighbors"]').click();
+ await page.locator('[data-envoy="dwor"][data-treaty="knowledge"]').click();
+ await page.evaluate(()=>{const w=window.folwark.scene.world;w.paused=false;for(let i=0;i<40;i++)w.tick(.05);w.paused=true;window.folwark.scene.onChange()});
+ await page.waitForTimeout(200);
+ await check(()=>window.folwark.scene.world.diplomacy.missions.length===1,'No envoy flight');
+ await check(()=>window.folwark.scene.unitViews.get('unit-111').sprite.texture.key==='gait-raven','Raven not animated in flight');
+ await check(()=>{const s=window.folwark.scene,a=s.world.units[11],v=s.unitViews.get(a.id);return v.sprite.y<a.y-25},'Raven not above ground');
+ await page.locator('[data-action="center"]').click();await page.screenshot({path:'output/playwright/raven-flight.png'});
+ await page.locator('[data-action="save"]').click();await page.reload();await page.locator('#loading').waitFor({state:'detached'});await page.locator('[data-menu="continue"]').click();
+ await page.evaluate(()=>{window.folwark.scene.world.paused=true;window.folwark.scene.onChange()});
+ await check(()=>window.folwark.scene.world.society.leaderId==='unit-107'&&window.folwark.scene.world.diplomacy.missions.length===1,'New systems not saved');
+ await page.evaluate(()=>{const w=window.folwark.scene.world;w.paused=false;for(let i=0;i<1050;i++)w.tick(.05);w.paused=true;window.folwark.scene.onChange()});
+ await check(()=>window.folwark.scene.world.diplomacy.agreements.some(a=>a.kind==='knowledge'),'No ratified agreement');
+ for(const [width,height]of [[1440,960],[390,844]]){
+  await page.setViewportSize({width,height});await page.locator('.side-tabs [data-tab="neighbors"]').click();await page.waitForTimeout(150);
+  await check(()=>document.documentElement.scrollWidth<=innerWidth,'Neighbors horizontal overflow');
+  await page.screenshot({path:'output/playwright/envoys-'+width+'.png'});
+  await page.locator('[data-tab="council"]').click();await page.waitForTimeout(150);
+  await check(()=>document.documentElement.scrollWidth<=innerWidth,'Election horizontal overflow');
+  await page.screenshot({path:'output/playwright/election-'+width+'.png'});
+ }
+ await page.locator('[data-action="settings"]').click();await page.locator('[data-pref="language"]').selectOption('pl');await page.locator('[data-menu="main"]').click();await page.locator('[data-menu="continue"]').click();await page.locator('[data-tab="council"]').click();
+ if(!(await page.locator('#inspector').innerText()).includes('Wladza nie nalezy do gatunku'))throw Error('Polish missing');
+ await page.setViewportSize({width:1440,height:960});
+ if(errors.length||failed.length)throw Error(JSON.stringify({errors,failed}));
+ return {cast:22,roles:true,coercion:true,henElected:true,perchedRaven:true,airborneEnvoy:true,treaty:true,saveRestore:true,bilingual:true,errors,failed};
+}

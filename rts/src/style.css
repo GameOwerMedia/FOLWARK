@@ -187,3 +187,24 @@ select{min-width:0;max-width:100%;background:#1b241b;color:#d8dec9;border:1px so
  .survival-panel h2,.propaganda-panel h2,.neighbors-panel h2{font-size:23px}
  .map-tools{top:10px}.political-meter>span{width:115px}
 }
+.role-panel,.election-panel,.embassy-panel{border-top:1px solid #716344;padding:16px 0;margin-top:16px}
+.role-panel p,.election-panel p{font-size:13px;line-height:1.6}
+.leader-badge{display:flex;align-items:center;gap:8px;color:#e8cd87;font-size:16px;margin:10px 0}
+.forced-warning{color:#edaaa0}
+.candidates{display:grid;gap:0}.candidate{border-bottom:1px solid #494734;padding:10px 0;min-width:0}
+.candidate-name{display:flex;align-items:center;gap:8px;width:100%;background:transparent;border:0;text-align:left;padding:0}
+.candidate-name .atlas{width:38px;flex-shrink:0}.candidate-name strong{flex:1;overflow-wrap:anywhere;font-size:15px}.candidate-name b{font-size:18px;color:#dabf7f}
+.candidate label{display:grid;grid-template-columns:60px minmax(0,1fr);align-items:center;gap:6px;margin:8px 0;font-size:12px}
+.candidate select,.role-panel select,.embassy-panel select{width:100%;min-width:0;background:#18231e;color:#e5dec7;border:1px solid #726446;padding:7px;font-size:13px}
+.candidate>button:last-child{display:flex;align-items:center;gap:6px;font-size:12px;padding:7px 10px}
+.embassy{border-top:1px solid #484d40;margin-top:12px;padding-top:8px}.embassy h4{font-size:16px;margin:8px 0}
+.treaty-action{display:grid;width:100%;text-align:left;gap:5px;padding:10px;margin-top:6px;border-radius:3px}
+.treaty-action span{display:flex;align-items:center;gap:6px;font-size:14px}.treaty-action small{font-size:12px;line-height:1.5;white-space:normal}.treaty-action b{font-size:12px;color:#c7bc93}
+.role-panel .wide-action,.embassy-panel .wide-action{white-space:normal}
+.recruit>div{flex-wrap:wrap}.election-panel svg,.embassy-panel svg,.role-panel svg{width:18px;height:18px;flex-shrink:0}
+
+@media(max-width:700px) and (min-height:650px){
+ .play-layout:has(.side-tabs button:not([data-tab="unit"]).active){grid-template-rows:120px minmax(0,1fr)}
+ .play-layout:has(.side-tabs button:not([data-tab="unit"]).active) .map-tools{flex-direction:row}
+ .play-layout:has(.side-tabs button:not([data-tab="unit"]).active) .minimap-wrap{display:none}
+}

@@ -4,9 +4,9 @@ import sharp from 'sharp';
 import prepared from '../src/game/prepared-atlas.json';
 import { frames } from '../src/game/Atlas';
 
-test('all 80 prepared objects have transparent padding and no overlapping frames',async()=>{
+test('all 81 prepared objects have transparent padding and no overlapping frames',async()=>{
  const {data,info}=await sharp('public/assets/sprites-prepared.png').ensureAlpha().raw().toBuffer({resolveWithObject:true});
- const objects=Object.entries(prepared);assert.equal(objects.length,80);
+ const objects=Object.entries(prepared);assert.equal(objects.length,81);
  for(const [name,f]of objects){
   const [x,y,w,h]=f.rect;
   assert.ok(x>=0&&y>=0&&x+w<=info.width&&y+h<=info.height,name+' outside atlas');

@@ -1,3 +1,5 @@
+import {treatyActive} from './Diplomacy';
+import {mandate} from './Society';
 import { DAY_SECONDS, type World, type Resource } from './World';
 import {reserveStock,receivePayment} from './Region';
 import { neighborSites,tradeSites } from './Landscape';
@@ -16,12 +18,13 @@ export const edicts:Record<Edict,{name:string;cost:Partial<Record<Resource,numbe
  crackdown:{name:'Pokaz sily strazy',cost:{gold:15},description:'+25 strachu, +12 krzywdy, -12 lojalnosci. Bezposrednie obrazenia pracownikow.'},
 };
 export const temperature=(w:World)=>w.scenario==='survival'?(w.day<4?8:w.day<7?0:w.day<9?-12:-24):w.season==='Zima'?-12:8;
-export const fuelPerDay=(w:World,heating:Heating=w.regime.heating)=>({off:0,normal:28,high:48})[heating]*(1+Math.max(0,-temperature(w))/24*1.5)*(w.regime.insulated?.7:1);
+export const fuelPerDay=(w:World,heating:Heating=w.regime.heating)=>({off:0,normal:28,high:48})[heating]*(1+Math.max(0,-temperature(w))/24*1.5)*(w.regime.insulated?.7:1)*(1-w.society.bedding*.1);
 export function bulletin(w:World,text:string){w.regime.official.unshift({day:w.day,text});w.regime.official=w.regime.official.slice(0,60)}
 export function edictReason(w:World,key:Edict){
  if(w.outcome)return 'Rozgrywka zakonczona';
  if(w.time<w.regime.nextEdict)return 'Nastepny dekret za '+Math.ceil((w.regime.nextEdict-w.time)/DAY_SECONDS*24)+' godz.';
  if(!w.count('stage'))return 'Wymaga placu zgromadzen';
+ if((key==='truth'||key==='propaganda')&&!w.living.some(a=>a.job==='govern'&&!a.forced))return 'Brak rzecznika. Przydziel organizacje wspolnoty.';
  if(key==='crackdown'&&!w.living.some(a=>a.species==='dog'))return 'Brak strazy';
  if(!w.canPay(edicts[key].cost))return 'Brak zasobow';return '';
 }
@@ -109,7 +112,8 @@ export function tickRegime(w:World,dt:number){
 }
 export function dailyRegime(w:World){
  const r=w.regime;if(w.scenario!=='survival')return;
- const need=w.living.length*2,bread=Math.min(w.resources.bread,need/2);w.resources.bread-=bread;
+ let need=w.living.length*2;for(const k of ['milk','eggs'] as const){const n=Math.min(w.resources[k],need);w.resources[k]-=n;need-=n}
+ const bread=Math.min(w.resources.bread,need/2);w.resources.bread-=bread;
  const grain=Math.min(w.economy.grain,need-bread*2);w.economy.grain-=grain;
  if(grain+bread*2<need){r.trust=clamp(r.trust-.06);w.log('Nie starczylo racji dziennych dla wszystkich.');for(const a of w.living)a.hunger=clamp(a.hunger+.12)}
  else{for(const a of w.living)a.hunger=clamp(a.hunger-.12);bulletin(w,'Wydano dzienne racje.')}
@@ -130,7 +134,9 @@ export const cityOrders={
 export type CityOrder=keyof typeof cityOrders;
 export function neighborOffer(w:World,id:string,kind:'trade'|'aid'|'contract'){
  const cargo:Partial<Record<Resource,number>>=id==='dwor'?{grain:85}:id==='mlyn'?{wood:75}:{bread:45};
- return {cost:kind==='aid'?{grain:25}:kind==='contract'?{}:id==='dwor'?{wood:40}:id==='mlyn'?{grain:45}:{gold:25},cargo:kind==='aid'?{}:kind==='contract'?{grain:100,gold:30}:cargo};
+ const cost:Partial<Record<Resource,number>>=kind==='aid'?{grain:25}:kind==='contract'?{}:id==='dwor'?{wood:40}:id==='mlyn'?{grain:45}:{gold:25};
+ if(kind==='trade'){const discount=(treatyActive(w,id,'trade')?.8:1)*(mandate(w,'commerce')?.85:1);for(const k of Object.keys(cost) as Resource[])cost[k]=Math.ceil(cost[k]!*discount)}
+ return {cost,cargo:kind==='aid'?{}:kind==='contract'?{grain:100,gold:30}:cargo};
 }
 export function sendConvoy(w:World,id:string,kind:'trade'|'aid'|'contract',unitId?:string,cityOrder:CityOrder='food'){
  const site=tradeSites.find(n=>n.id===id),r=w.regime;

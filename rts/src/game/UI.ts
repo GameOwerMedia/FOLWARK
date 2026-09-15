@@ -1,3 +1,7 @@
+import {rolePanel,electionPanel,embassyPanel} from './SocietyPanel';
+import {roles,suited} from '../simulation/Roles';
+import {nominate,campaign,elect,type Platform} from '../simulation/Society';
+import {sendEnvoy,onMission,type Treaty} from '../simulation/Diplomacy';
 import {localizeDOM,setLanguage,locale} from '../i18n';
 import {attachStartMenu} from './StartMenu';
 import {saveGame,decodeSave,escapeHtml} from './SaveStore';
@@ -10,7 +14,7 @@ import { issueEdict, setPress, insulate, sendConvoy, temperature, edicts, cityOr
 import { neighborSites,cityGate,tradeSites } from '../simulation/Landscape';
 import { resourceNames, resourceArt, type Laws, type Technology } from '../simulation/Development';
 import { roads, pond } from '../simulation/Landscape';
-import { World, buildingDefs, buildableKinds, speciesNames, taskNames, DAY_SECONDS, WIDTH, HEIGHT, type BuildingKind, type Resource } from '../simulation/World';
+import { World, buildingDefs, buildableKinds, speciesNames, taskNames, DAY_SECONDS, WIDTH, HEIGHT, type BuildingKind, type Resource, type Job } from '../simulation/World';
 import type { Species } from '../simulation/Animal';
 
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
@@ -66,10 +70,11 @@ export function attachUI(scene:FarmScene){
   const save=()=>{try{saveGame(scene.world,'quick');scene.world.notify('Zapisano gre na tym urzadzeniu.')}catch{scene.world.notify('Przegladarka nie pozwala zapisac gry.')}};
   const load=(key:string)=>{try{const raw=localStorage.getItem(key);if(!raw){scene.world.notify('Nie ma jeszcze takiego zapisu.');return}const world=decodeSave(raw).world;scene.world=world;scene.resetViews();scene.selected=[world.living[0]?.id].filter(Boolean);scene.selectedBuilding=null;lastRoster='';closeModal();scene.world.notify('Wczytano zapis gry.')}catch{scene.world.notify('Nie udalo sie odczytac zapisu.')}};
   let selectedNeighbor='dwor';
+  const roleChoices:Record<string,Job>={};let forcedOrder:{id:string;job:Exclude<Job,null>}|null=null;
   scene.onNeighbor=id=>{selectedNeighbor=id;activeTab='neighbors';render()};
   let pendingEdict:Edict|null=null;
   let tradeChoice:Resource='wood';
-  document.addEventListener('change',e=>{const target=e.target as HTMLInputElement;if(target.hasAttribute('data-heating')&&['off','normal','high'].includes(target.value))scene.world.regime.heating=target.value as Heating;if(target.hasAttribute('data-press')){setPress(scene.world,target.value as Press);target.value=scene.world.regime.press}if(target.id==='trade-resource'){tradeChoice=target.value as Resource;el('trade-price').textContent=tradePrice(scene.world,tradeChoice)}if(target.dataset.law){scene.world.setLaw(target.dataset.law as keyof Laws,target.value as Laws[keyof Laws]);render()}if(target.dataset.setting==='edge-scroll')scene.edgeScroll=target.checked});
+  document.addEventListener('change',e=>{const target=e.target as HTMLInputElement;if(target.dataset.platform){nominate(scene.world,target.dataset.platform,target.value as Platform);render()}if(target.id==='role-job')roleChoices[scene.selected[0]]=target.value as Job;if(target.hasAttribute('data-heating')&&['off','normal','high'].includes(target.value))scene.world.regime.heating=target.value as Heating;if(target.hasAttribute('data-press')){setPress(scene.world,target.value as Press);target.value=scene.world.regime.press}if(target.id==='trade-resource'){tradeChoice=target.value as Resource;el('trade-price').textContent=tradePrice(scene.world,tradeChoice)}if(target.dataset.law){scene.world.setLaw(target.dataset.law as keyof Laws,target.value as Laws[keyof Laws]);render()}if(target.dataset.setting==='edge-scroll')scene.edgeScroll=target.checked});
   document.addEventListener('click',e=>{
     const target=(e.target as HTMLElement).closest<HTMLButtonElement>('button');if(!target||target.disabled)return;
     if(sound)beep();
@@ -77,6 +82,10 @@ export function attachUI(scene:FarmScene){
     if(target.dataset.cityOrder)sendConvoy(scene.world,'city','trade',undefined,target.dataset.cityOrder as CityOrder);
     if(target.dataset.diplomacy)sendConvoy(scene.world,target.dataset.neighbor!,target.dataset.diplomacy as 'trade'|'aid');
     if(target.dataset.edict){const key=target.dataset.edict as Edict;if(key==='force'||key==='crackdown'){pendingEdict=key;showModal('edict',`<div class="dialog-header"><h2>${edicts[key].name}</h2>${button('close','Anuluj','x')}</div><p>${edicts[key].description} Skutki dla zdrowia i zaufania nie zostana cofniete po zakonczeniu dekretu.</p><div class="dialog-actions"><button data-action="close">Anuluj</button><button class="danger-action" data-action="confirm-edict">Wydaj rozkaz</button></div>`)}else issueEdict(scene.world,key)}
+    if(target.dataset.campaign)campaign(scene.world,target.dataset.campaign);
+    if(target.dataset.envoy){const id=el<HTMLSelectElement>('envoy-unit')?.value;if(id)sendEnvoy(scene.world,id,target.dataset.envoy,target.dataset.treaty as Treaty)}
+    if(target.dataset.natural){const a=scene.world.living.find(a=>a.id===target.dataset.natural);if(a&&roles[a.species].primary){scene.world.assign([a.id],roles[a.species].primary!);if(a.species==='mule')a.autoBuilder=true}}
+    if(target.dataset.roleAssign){const a=scene.world.living.find(a=>a.id===target.dataset.roleAssign),job=el<HTMLSelectElement>('role-job').value as Exclude<Job,null>;if(a){if(suited(a,job))scene.world.assign([a.id],job);else{forcedOrder={id:a.id,job};showModal('forced-assignment',`<div class="dialog-header"><h2>Praca pod przymusem</h2>${button('close','Anuluj','x')}</div><p>${escapeHtml(a.name)} / ${taskNames[job]}</p><p>15% zwyklej wydajnosci. Szybsze zmeczenie, narastajaca krzywda i utrata zdrowia. Pracownik moze protestowac lub umrzec.</p><div class="dialog-actions"><button data-action="close">Anuluj</button><button data-action="confirm-force-role" class="danger-action">Wymus prace</button></div>`)}}}
     const action=target.dataset.action;
     if(target.dataset.staff)scene.world.staffBuilding(Number(target.dataset.staff));
     if(target.dataset.release)scene.world.releaseBuilding(Number(target.dataset.release));
@@ -95,6 +104,9 @@ export function attachUI(scene:FarmScene){
     if(target.dataset.recruit)scene.world.recruit(target.dataset.recruit as Species);
     if(target.dataset.art)showModal('art-'+target.dataset.art,`<div class="dialog-header"><h2>Archiwum folwarku</h2>${button('library','Powrot do ksiegi','arrow-left')}${button('close','Zamknij','x')}</div><img class="full-art" src="${assetUrl(target.dataset.art)}" alt="${target.dataset.art}">`);
     switch(action){
+      case 'confirm-force-role':if(forcedOrder){scene.world.assign([forcedOrder.id],forcedOrder.job,undefined,true);forcedOrder=null}closeModal();break;
+      case 'election':elect(scene.world);break;
+      case 'wool-bedding':if(scene.world.society.bedding<3&&scene.world.canPay({wool:12})){scene.world.pay({wool:12});scene.world.society.bedding++;scene.world.notify('Welna ocieplila poslania. Zuzycie opalu spadlo o 10%.')}break;
       case 'main-menu':if(modal.open){modal.close();modalKey=''}menu.show();break;
       case 'saves':menu.show('saves');break;
       case 'insulate':insulate(scene.world);break;
@@ -135,7 +147,7 @@ export function attachUI(scene:FarmScene){
   el<HTMLCanvasElement>('minimap').addEventListener('pointerdown',e=>{
     const r=(e.currentTarget as HTMLElement).getBoundingClientRect();scene.cameras.main.centerOn((e.clientX-r.left)/r.width*WIDTH,(e.clientY-r.top)/r.height*HEIGHT);
   });
-  let sidebarSignature='',traySignature='';
+  let sidebarSignature='',traySignature='',inspectorContext='';
   function render(){
     const w=scene.world;
     const ch=chapter(w);el('chapter-label').textContent='ROZDZIAL '+ch[0];el('chapter-title').textContent=ch[1];
@@ -152,7 +164,7 @@ export function attachUI(scene:FarmScene){
     el('population').textContent=w.living.length+'/'+w.populationCap;
     el('population-map').textContent=w.living.length+' MIESZKANCOW  /  '+w.buildings.length+' BUDYNKOW';
     el('selection-count').textContent=scene.selected.length?scene.selected.length+' wybrano':'';
-    document.querySelectorAll<HTMLButtonElement>('.order-buttons button').forEach(b=>b.disabled=b.dataset.action!=='idle-select'&&(!scene.selected.length||!!w.outcome));
+    document.querySelectorAll<HTMLButtonElement>('.order-buttons button').forEach(b=>{const action=b.dataset.action!,job=({harvest:'harvest',wood:'wood',stone:'stone','build-order':'build',patrol:'patrol',guard:'guard'} as Record<string,Job>)[action];b.disabled=action!=='idle-select'&&(!scene.selected.length||!!w.outcome||!w.living.some(a=>scene.selected.includes(a.id)&&!onMission(w,a.id)&&(!job||suited(a,job))))});
     document.querySelector('[data-action="pan"]')?.classList.toggle('active',scene.mode==='pan');
     const pause=document.querySelector<HTMLButtonElement>('[data-action="pause"]')!;pause.classList.toggle('active',w.paused);pause.innerHTML=icon(w.paused?'play':'pause');
     document.querySelectorAll<HTMLElement>('[data-speed]').forEach(b=>b.classList.toggle('active',Number(b.dataset.speed)===w.speed));
@@ -168,18 +180,20 @@ export function attachUI(scene:FarmScene){
     const roster=w.living.map(a=>a.id+scene.selected.includes(a.id)).join('');
     if(roster!==lastRoster){el('roster').innerHTML=w.living.map(a=>`<button class="resident ${scene.selected.includes(a.id)?'selected':''}" data-unit="${a.id}" title="${a.name} / ${speciesNames[a.species]}" aria-label="Wybierz: ${a.name}">${art('portrait-'+a.species)}</button>`).join('');lastRoster=roster}
     let html='';
-    if(activeTab==='propaganda'){html=propagandaPanel(w)}else if(activeTab==='neighbors'){html=neighborsPanel(w,selectedNeighbor)}else if(activeTab==='mission'&&w.scenario==='survival'){html=survivalPanel(w)}else if(activeTab==='unit'){
+    if(activeTab==='propaganda'){html=propagandaPanel(w)}else if(activeTab==='neighbors'){html=embassyPanel(w)+neighborsPanel(w,selectedNeighbor)}else if(activeTab==='mission'&&w.scenario==='survival'){html=survivalPanel(w)}else if(activeTab==='unit'){
       const a=w.living.find(a=>a.id===scene.selected[0]),b=w.buildings.find(b=>b.id===scene.selectedBuilding);
-      if(a)html=`<div class="unit-summary"><span class="eyebrow">MIESZKANIEC FOLWARKU</span><div class="unit-portrait">${art('portrait-'+a.species)}</div><h2>${a.name}</h2><span class="unit-role">${speciesNames[a.species]}</span><div class="current-task"><span class="live-dot"></span>${a.job==='harvest'&&a.task==='idle'&&w.economy.grain>=w.capacity-.1?'Magazyn pelny':taskNames[a.task]}${a.queue.length?' / kolejka '+a.queue.length:''}</div></div>
+      if(a)html=`<div class="unit-summary"><span class="eyebrow">MIESZKANIEC FOLWARKU</span><div class="unit-portrait">${art('portrait-'+a.species)}</div><h2>${escapeHtml(a.name)}</h2><span class="unit-role">${speciesNames[a.species]}</span><div class="current-task"><span class="live-dot"></span>${a.job==='harvest'&&a.task==='idle'&&w.economy.grain>=w.capacity-.1?'Magazyn pelny':taskNames[a.task]}${a.queue.length?' / kolejka '+a.queue.length:''}</div></div>
         <div class="stats">${bar('Zdrowie',a.health*100,'green')}${bar('Glod',a.hunger*100,'gold')}${bar('Zmeczenie',a.fatigue*100,'blue')}${bar('Lojalnosc',a.loyalty*100,'green')}${bar('Krzywda',a.grievance*100,'red')}</div>
-        <div class="cargo"><span>${icon('package')} Niesiony ladunek</span><b>${Math.floor(a.carriedGrain+a.load)} / ${a.carryCapacity}</b></div>`;
-      else if(b)html=`<div class="building-summary"><span class="eyebrow">ZABUDOWA FOLWARKU</span><div class="building-art">${art(buildingDefs[b.kind].art)}</div><h2>${buildingDefs[b.kind].name}</h2><p>${buildingDefs[b.kind].description}</p><div class="current-task">${b.progress<1?'Budowa: '+Math.floor(b.progress*100)+'%':'Gotowy do pracy'}</div></div>${b.kind==='house'?`<div class="recruit"><span class="section-heading">NOWI MIESZKANCY / 35 ZBOZA + 15 MONET</span><div>${(['horse','sheep','hen','goat'] as Species[]).map(s=>`<button data-recruit="${s}" title="Przyjmij: ${speciesNames[s]}" aria-label="Przyjmij: ${speciesNames[s]}">${art('portrait-'+s)}</button>`).join('')}</div></div>`:''}${buildingControls(w,b)}`;
+        <div class="cargo"><span>${icon('package')} Niesiony ladunek</span><b>${Math.floor(a.carriedGrain+a.load)} / ${a.carryCapacity}</b></div>${rolePanel(w,a,roleChoices[a.id])}`;
+      else if(b)html=`<div class="building-summary"><span class="eyebrow">ZABUDOWA FOLWARKU</span><div class="building-art">${art(buildingDefs[b.kind].art)}</div><h2>${buildingDefs[b.kind].name}</h2><p>${buildingDefs[b.kind].description}</p><div class="current-task">${b.progress<1?'Budowa: '+Math.floor(b.progress*100)+'%':'Gotowy do pracy'}</div></div>${b.kind==='house'?`<div class="recruit"><span class="section-heading">NOWI MIESZKANCY / 35 ZBOZA + 15 MONET</span><div>${(['horse','cow','sheep','hen','goat','pig','dog','raven','donkey','mule','ram','boar','cat','duck','goose'] as Species[]).map(s=>`<button data-recruit="${s}" title="Przyjmij: ${speciesNames[s]}" aria-label="Przyjmij: ${speciesNames[s]}">${art('portrait-'+s)}</button>`).join('')}</div></div>`:''}${buildingControls(w,b)}`;
       else html=`<div class="settlement-summary"><span class="eyebrow">WSPOLNOTA</span>${art('house')}<h2>Folwark zwierzat</h2><p>Wolnosc zaczyna sie od pelnej stodoly.</p><div class="overview-numbers"><span><b>${w.living.length}</b>mieszkancow</span><span><b>${w.buildings.length}</b>budynkow</span></div></div>`;
     }else if(activeTab==='economy'){html=economyPanel(w)}else if(activeTab==='research'){html=researchPanel(w)}else if(activeTab==='council'){
-      html=`<div class="council"><span class="eyebrow">DECYZJE WSPOLNOTY</span><h2>Przy wspolnym stole</h2><p class="muted">Racje zywnosciowe</p><div class="policy-options"><button data-policy="equal" class="${w.politics.rationPolicy==='equal'?'selected':''}">${icon('scale')}<span>Rowne racje</span></button><button data-policy="privileged" class="${w.politics.rationPolicy==='privileged'?'selected':''}">${icon('crown')}<span>Przywileje rady</span></button></div><button class="wide-action" data-action="feast" title="40 zboza. Mniej glodu i krzywdy.">${icon('utensils')} Wspolny posilek <b>40 ${art('wheat')}</b></button>${lawsPanel(w,tradeChoice)}<h3>Wymiana zboza</h3><button class="wide-action" data-action="buy">${icon('shopping-basket')} Kup 50 zboza <b>15 ${art('gold')}</b></button><button class="wide-action" data-action="sell">${icon('coins')} Sprzedaj 40 zboza <b>+12 ${art('gold')}</b></button><h3>Nowi mieszkancy</h3><div class="recruit"><div>${(['horse','sheep','hen','goat'] as Species[]).map(s=>`<button data-recruit="${s}" title="Przyjmij: ${speciesNames[s]}. 35 zboza, 15 monet." aria-label="Przyjmij: ${speciesNames[s]}">${art('portrait-'+s)}</button>`).join('')}</div></div></div>`;
+      html=`<div class="council"><span class="eyebrow">DECYZJE WSPOLNOTY</span><h2>Przy wspolnym stole</h2><p class="muted">Racje zywnosciowe</p><div class="policy-options"><button data-policy="equal" class="${w.politics.rationPolicy==='equal'?'selected':''}">${icon('scale')}<span>Rowne racje</span></button><button data-policy="privileged" class="${w.politics.rationPolicy==='privileged'?'selected':''}">${icon('crown')}<span>Przywileje rady</span></button></div><button class="wide-action" data-action="feast" title="40 zboza. Mniej glodu i krzywdy.">${icon('utensils')} Wspolny posilek <b>40 ${art('wheat')}</b></button>${electionPanel(w)}${lawsPanel(w,tradeChoice)}<h3>Wymiana zboza</h3><button class="wide-action" data-action="buy">${icon('shopping-basket')} Kup 50 zboza <b>15 ${art('gold')}</b></button><button class="wide-action" data-action="sell">${icon('coins')} Sprzedaj 40 zboza <b>+12 ${art('gold')}</b></button><h3>Nowi mieszkancy</h3><div class="recruit"><div>${(['horse','cow','sheep','hen','goat','pig','dog','raven','donkey','mule','ram','boar','cat','duck','goose'] as Species[]).map(s=>`<button data-recruit="${s}" title="Przyjmij: ${speciesNames[s]}. 35 zboza, 15 monet." aria-label="Przyjmij: ${speciesNames[s]}">${art('portrait-'+s)}</button>`).join('')}</div></div></div>`;
     }else if(activeTab==='mission'){html=`<div class="mission-summary"><span class="eyebrow">${w.scenario==='campaign'?'SIEDEM DNI DO ZIMY':'ROZWOJ WSPOLNOTY'}</span><h2>Wspolna przyszlosc</h2><p>${w.season} / Dzien ${w.day}</p><div class="mission-goals">${el('goals').innerHTML}</div><p>${w.scenario==='campaign'?'O swicie dnia 8: 350 zboza, trzy nowe budynki i niepokoje ponizej 35%.':'Tryb swobodny. Wspolnota rozwija sie bez koncowej daty. Zima ogranicza odrost plonow.'}</p><div class="mission-unrest">Niepokoje: ${unrest}% / Mieszkancy: ${w.living.length}</div></div>`;
     }else html=`<div class="journal"><span class="eyebrow">PAMIETAMY</span><h2>Kronika folwarku</h2>${w.journal.map(entry=>`<article><span>DZIEN ${entry.day}</span><p>${escapeHtml(entry.text)}</p></article>`).join('')}</div>`;
+    const context=activeTab+(activeTab==='unit'?(scene.selected[0]??scene.selectedBuilding??''):'');
     if(html!==sidebarSignature&&document.activeElement?.tagName!=='SELECT'){el('inspector').innerHTML=html;sidebarSignature=html}
+    if(context!==inspectorContext){document.querySelector('.sidebar')!.scrollTop=0;inspectorContext=context}
     el('build-tray').hidden=!tray;
     if(tray){
       const signature=[w.resources.wood,w.resources.stone,w.economy.grain,w.resources.gold,w.resources.tools].map(Math.floor).join('/');

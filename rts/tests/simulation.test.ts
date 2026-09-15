@@ -44,7 +44,7 @@ test('campaign can be won through construction and production',()=>{
    w.tick(.1);
  }
  assert.equal(w.built,3);assert.equal(w.outcome,'Wspolna przyszlosc');
- assert.equal(w.living.length,12);
+ assert.equal(w.living.length,22);
  console.log('Campaign result:',Math.floor(w.economy.grain),'grain,',Math.round(w.politics.unrest*100),'unrest');
 });
 test('starvation is a real loss condition',()=>{

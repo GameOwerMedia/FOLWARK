@@ -1,3 +1,6 @@
+import {roles,aptitude,suited,workEfficiency,roleWorkplace,tickDuty} from './Roles';
+import {createSociety,tickSociety,validSociety,mandate,type SocietyState} from './Society';
+import {createDiplomacy,tickDiplomacy,validDiplomacy,onMission,type DiplomacyState} from './Diplomacy';
 import {createRegion,tickRegion,validRegion,type RegionState} from './Region';
 import { createRegime, tickRegime, dailyRegime, validRegime, type RegimeState } from './Regime';
 import { Navigation, type Point } from './Navigation';
@@ -8,17 +11,18 @@ import { createEconomy, harvestToInventory, eatFromStore, rest } from './Economy
 import { createPolitics, applyPoliticalPressure, updateUnrest, shouldRefuseWork, shouldProtest, rationCost } from './Politics';
 
 export const WIDTH = WORLD_WIDTH, HEIGHT = WORLD_HEIGHT, DAY_SECONDS = 65;
-export type Resource = 'grain' | 'wood' | 'stone' | 'gold' | 'flour' | 'bread' | 'tools' | 'knowledge';
-export type BuildingKind = 'house'|'barn'|'field'|'garden'|'granary'|'well'|'infirmary'|'mill'|'tower'|'lumber'|'quarry'|'stage'|'bakery'|'smith'|'school'|'library'|'bees'|'orchard'|'market';
-export type Job = 'harvest'|'wood'|'stone'|'patrol'|'build'|'produce'|'guard'|null;
+export type Resource = 'grain' | 'wood' | 'stone' | 'gold' | 'flour' | 'bread' | 'tools' | 'knowledge' | 'milk' | 'eggs' | 'wool' | 'herbs';
+export type BuildingKind = 'house'|'barn'|'field'|'garden'|'granary'|'well'|'infirmary'|'mill'|'tower'|'lumber'|'quarry'|'stage'|'bakery'|'smith'|'school'|'library'|'bees'|'orchard'|'market'|'pasture';
+export type Job = 'harvest'|'wood'|'stone'|'patrol'|'build'|'produce'|'guard'|'care'|'study'|'govern'|null;
 export type Building = {id:number; kind:BuildingKind; x:number; y:number; progress:number; stock:number; priority:number; enabled:boolean; production:number; batches:number; level:number};
-export type Resident = AnimalState & {job:Job; target:number|null; path:{x:number;y:number}[]; arrival:AnimalTask; resource:Resource; load:number; destination:Point|null; activityTarget:number|null; heading:number; travel:number; wait:number; patrolStep:number; queue:Point[]; patrolCenter:Point|null; autoBuilder:boolean};
+export type Resident = AnimalState & {job:Job; target:number|null; path:{x:number;y:number}[]; arrival:AnimalTask; resource:Resource; load:number; destination:Point|null; activityTarget:number|null; heading:number; travel:number; wait:number; patrolStep:number; queue:Point[]; patrolCenter:Point|null; autoBuilder:boolean;forced:boolean;dutyProgress:number};
 export type Chronicle = {day:number; text:string};
 export type Choice = {label:string; effect:Partial<Record<Resource,number>>; calm?:number;trust?:number;fear?:number;integrity?:number};
 export type Dilemma = {title:string; text:string; choices:Choice[]};
-type Save = {version:5; region:RegionState; regime:RegimeState; roads:Road[]; laws:Laws; research:Technology[]; scenario:'campaign'|'sandbox'|'survival'; accumulator:number; time:number; economy:ReturnType<typeof createEconomy>; resources:Record<Exclude<Resource,'grain'>,number>; politics:ReturnType<typeof createPolitics>; units:Resident[]; buildings:Building[]; journal:Chronicle[]; built:number; nextId:number; event:Dilemma|null; outcome:string|null};
+type Save = {version:6; society:SocietyState; diplomacy:DiplomacyState; region:RegionState; regime:RegimeState; roads:Road[]; laws:Laws; research:Technology[]; scenario:'campaign'|'sandbox'|'survival'; accumulator:number; time:number; economy:ReturnType<typeof createEconomy>; resources:Record<Exclude<Resource,'grain'>,number>; politics:ReturnType<typeof createPolitics>; units:Resident[]; buildings:Building[]; journal:Chronicle[]; built:number; nextId:number; event:Dilemma|null; outcome:string|null};
 export const buildingDefs: Record<BuildingKind,{name:string; art:string; width:number; cost:Partial<Record<Resource,number>>; description:string}> = {
-  house:{name:'Dom mieszkalny',art:'house',width:220,cost:{wood:70,stone:25},description:'+4 miejsca dla mieszkancow'},
+  pasture:{name:'Pastwisko',art:'pasture',width:250,cost:{wood:35,grain:10},description:'Wypas krow i owiec. Mleko i welna wymagaja paszy.'},
+  house:{name:'Dom mieszkalny',art:'house',width:220,cost:{wood:70,stone:25},description:'+8 miejsc dla mieszkancow'},
   barn:{name:'Stodola',art:'barn',width:245,cost:{wood:80,stone:30},description:'Magazyn i punkt rozladunku'},
   field:{name:'Pole pszenicy',art:'field',width:260,cost:{wood:35,grain:15},description:'Odnawialne zboze. Wymaga pracownika.'},
   garden:{name:'Ogrod warzywny',art:'garden',width:215,cost:{wood:40,grain:20},description:'Szybsze zbiory i posilki'},
@@ -40,37 +44,43 @@ export const buildingDefs: Record<BuildingKind,{name:string; art:string; width:n
 };
 export const buildableKinds:BuildingKind[]=(Object.keys(buildingDefs) as BuildingKind[]).filter(k=>k!=='lumber'&&k!=='quarry');
 export const speciesNames:Record<Species,string> = {pig:'Zarzadca',dog:'Straznik',horse:'Kon roboczy',cow:'Krowa',sheep:'Owca',hen:'Kura',goat:'Zielarka',ram:'Baran',boar:'Dzik',cat:'Zwiadowca',raven:'Poslaniec',donkey:'Mysliciel',mule:'Budowniczy',duck:'Kurier',goose:'Herold'};
-export const taskNames:Record<AnimalTask,string> = {idle:'Oczekuje',moving:'W drodze',harvest:'Zbiera plony',hauling:'Transportuje',eating:'Posilek',resting:'Odpoczywa',refusing:'Odmawia pracy',protesting:'Protestuje',wood:'Zbiera drewno',stone:'Wydobywa kamien',patrol:'Patroluje',deposit:'Rozladowuje',build:'Buduje',produce:'Wytwarza',guard:'Pilnuje'};
+export const taskNames:Record<AnimalTask,string> = {idle:'Oczekuje',moving:'W drodze',harvest:'Zbiera plony',hauling:'Transportuje',eating:'Posilek',resting:'Odpoczywa',refusing:'Odmawia pracy',protesting:'Protestuje',wood:'Zbiera drewno',stone:'Wydobywa kamien',patrol:'Patroluje',deposit:'Rozladowuje',build:'Buduje',produce:'Wytwarza',guard:'Pilnuje',care:'Praca gospodarska',study:'Bada i uczy',govern:'Organizuje wspolnote',diplomacy:'Poselstwo'};
 const clamp=(n:number,min=0,max=1)=>Math.max(min,Math.min(max,n));
 export class World {
-  time=0;speed=1;paused=false;economy=createEconomy();resources={wood:180,stone:120,gold:80,flour:0,bread:12,tools:0,knowledge:0};politics=createPolitics();
+  time=0;speed=1;paused=false;economy=createEconomy();resources={wood:180,stone:120,gold:80,flour:0,bread:12,tools:0,knowledge:0,milk:8,eggs:6,wool:0,herbs:0};politics=createPolitics();
   units:Resident[]=[];buildings:Building[]=[];journal:Chronicle[]=[];built=0;nextId=100;event:Dilemma|null=null;outcome:string|null=null;
   toast='';toastSerial=0;revision=0;readonly navigation=new Navigation();private accumulator=0;
-  regime=createRegime();region=createRegion();
+  regime=createRegime();region=createRegion();society=createSociety();diplomacy=createDiplomacy();
   roads:Road[]=[];laws=defaultLaws();research:Technology[]=[];roadRevision=0;
   constructor(public scenario:'campaign'|'sandbox'|'survival'='campaign'){
-    this.economy.grain=155;
-    const layout:[BuildingKind,number,number][]=[['barn',825,395],['house',1100,445],['field',430,385],['field',565,520],['garden',1020,675],['well',790,720],['lumber',1250,870],['quarry',1460,655],['stage',1050,970],['lumber',2400,1460],['quarry',3020,1720],['orchard',1170,1860]];
+    this.economy.grain=210;
+    const layout:[BuildingKind,number,number][]=[['barn',825,395],['house',1100,445],['field',430,385],['field',565,520],['garden',1020,675],['well',790,720],['lumber',1250,870],['quarry',1460,655],['stage',1050,970],['lumber',2400,1460],['quarry',3020,1720],['orchard',1170,1860],['pasture',585,825]];
     this.buildings=layout.map(([kind,x,y],id)=>({id,kind,x,y,stock:['lumber','quarry'].includes(kind)?900:180,progress:1,priority:0,enabled:true,production:0,batches:0,level:1}));
     this.rebuildGrid();
     const people:[string,Species,number,number,Job][]=[
       ['Bokser','horse',610,430,'harvest'],['Koniczyna','horse',670,540,'harvest'],
-      ['Napoleon','pig',1060,530,null],['Azor','dog',1180,575,'patrol'],
-      ['Malina','cow',965,730,'harvest'],['Biala','sheep',1160,820,'wood'],
-      ['Chmurka','sheep',1310,715,'stone'],['Ruda','hen',900,680,'harvest'],
-      ['Iskra','hen',960,780,'harvest'],['Ruta','goat',900,590,null],
-      ['Benjamin','donkey',1150,680,'wood'],['Kruk','raven',750,630,null],
+      ['Napoleon','pig',1060,530,'govern'],['Azor','dog',1180,575,'patrol'],
+      ['Malina','cow',965,730,'care'],['Biala','sheep',1160,820,'care'],
+      ['Chmurka','sheep',1310,715,'care'],['Ruda','hen',900,680,'care'],
+      ['Iskra','hen',960,780,'care'],['Ruta','goat',900,590,'care'],
+      ['Benjamin','donkey',1150,680,'study'],['Mojzesz','raven',750,630,null],
+      ['Snowball','pig',1010,535,'study'],['Squealer','pig',1090,575,'govern'],
+      ['Mollie','horse',615,690,'harvest'],['Muriel','goat',960,635,'care'],
+      ['Jessie','dog',1195,590,'patrol'],['Bluebell','dog',1130,610,'guard'],
+      ['Pincher','dog',1220,610,'patrol'],['Majster','mule',1220,770,null],
+      ['Twardy','boar',1330,825,'stone'],['Brzask','mule',1300,940,'wood'],
     ];
     for(const[name,species,x,y,job]of people){const a=this.addUnit(name,species,x,y);if(job)this.assign([a.id],job)}
+    this.society.leaderId=this.units.find(a=>a.name==='Napoleon')!.id;this.society.platform='industry';this.politics.leaderSpecies='pig';
     this.log('Pierwszy dzien wolnego folwarku. Zapasy na zime sa wspolna sprawa.');
   }
   get day(){return Math.floor((this.time+1e-7)/DAY_SECONDS)+1}
   get season(){if(this.scenario==='survival')return this.day>=7?'Zima':'Jesien';return ['Jesien','Zima','Wiosna','Lato'][Math.floor((this.day-1)/7)%4]}
-  get workRate(){return ({rested:.8,balanced:1,intensive:1.3})[this.laws.work]*(this.time<this.regime.forcedUntil?1.35:1)}
+  get workRate(){return (mandate(this,'industry')?1.12:1)*({rested:.8,balanced:1,intensive:1.3})[this.laws.work]*(this.time<this.regime.forcedUntil?1.35:1)}
   get workFatigue(){return ({rested:.65,balanced:1,intensive:1.5})[this.laws.work]*(this.time<this.regime.forcedUntil?1.6:1)}
   get capacity(){return 450+this.count('granary')*300+Math.max(0,this.count('barn')-1)*150}
   storageLimit(resource:Resource){return resource==='gold'||resource==='knowledge'?Infinity:resource==='wood'||resource==='stone'?this.capacity*2:this.capacity}
-  get populationCap(){return 8+this.count('house')*4}
+  get populationCap(){return this.count('barn')*16+this.count('house')*8}
   get living(){return this.units.filter(a=>a.health>0)}
   count(kind:BuildingKind){return this.buildings.filter(b=>b.kind===kind&&b.progress>=1&&b.enabled).length}
   get(resource:Resource){return resource==='grain'?this.economy.grain:this.resources[resource]}
@@ -81,7 +91,7 @@ export class World {
   log(text:string){this.journal.unshift({day:this.day,text});this.journal=this.journal.slice(0,60);this.notify(text)}
   addUnit(name:string,species:Species,x:number,y:number){
     const point=this.navigation.nearestFree({x,y})??{x:805,y:550};
-    const a:Resident={...createAnimal({id:'unit-'+this.nextId++,name,species,...point,strength:species==='horse'?.95:.65,carryCapacity:species==='horse'?18:10}),job:null,target:null,path:[],arrival:'idle',resource:'grain',load:0,destination:null,activityTarget:null,heading:0,travel:0,wait:0,patrolStep:0,queue:[],patrolCenter:null,autoBuilder:true};
+    const a:Resident={...createAnimal({id:'unit-'+this.nextId++,name,species,...point,strength:roles[species].strength,carryCapacity:roles[species].capacity}),job:null,target:null,path:[],arrival:'idle',resource:'grain',load:0,destination:null,activityTarget:null,heading:0,travel:0,wait:0,patrolStep:0,queue:[],patrolCenter:null,autoBuilder:species==='mule',forced:false,dutyProgress:0};
     if(this.research.includes('logistics'))a.carryCapacity+=8;
     this.units.push(a);this.revision++;return a;
   }
@@ -89,7 +99,7 @@ export class World {
     if(this.living.length>=this.populationCap){this.notify('Brak miejsc. Zbuduj dom mieszkalny.');return false}
     if(!this.canPay({grain:35,gold:15})){this.notify('Potrzeba 35 zboza i 15 monet.');return false}
     this.pay({grain:35,gold:15});const names=['Brzask','Figa','Dabek','Zefir','Kasztan','Mila'];
-    this.addUnit(names[this.nextId%names.length],species,1080,570);this.log('Nowy mieszkaniec dolacza do folwarku.');return true;
+    const a=this.addUnit(names[this.nextId%names.length],species,1080,570);if(roles[species].primary)this.assign([a.id],roles[species].primary!);this.log('Nowy mieszkaniec dolacza do folwarku.');return true;
   }
   footprint(b:Pick<Building,'kind'|'x'|'y'>){
     const width=buildingDefs[b.kind].width;
@@ -122,10 +132,10 @@ export class World {
     return this.buildings.filter(b=>b.kind===kind&&b.progress>=1).sort((b,c)=>Math.hypot(b.x-a.x,b.y-a.y)-Math.hypot(c.x-a.x,c.y-a.y))[0];
   }
   rebuildGrid(){
-    this.navigation.rebuild(this.buildings.filter(b=>!['field','garden','orchard','lumber','quarry','stage'].includes(b.kind)).map(b=>this.footprint(b)),this.roads);
+    this.navigation.rebuild(this.buildings.filter(b=>!['field','garden','orchard','lumber','quarry','stage','pasture'].includes(b.kind)).map(b=>this.footprint(b)),this.roads);
   }
   private walk(a:Resident,x:number,y:number,arrival:AnimalTask){
-    const route=this.navigation.route(a,{x,y});
+    const route=a.species==='raven'?[{x:clamp(x,30,WIDTH-30),y:clamp(y,30,HEIGHT-30)}]:this.navigation.route(a,{x,y});
     if(!route){a.path=[];a.task='idle';a.wait=3;a.destination=null;return false}
     a.path=route;a.destination=route.at(-1)??null;a.arrival=arrival;
     a.task=a.path.length?(a.carriedGrain+a.load>0?'hauling':'moving'):arrival;
@@ -133,7 +143,7 @@ export class World {
   }
   private slot(a:Resident,b:Building,work=false):Point {
     const i=this.units.indexOf(a);
-    if(work&&['field','garden','orchard'].includes(b.kind))return {x:b.x+(i%3-1)*35,y:b.y-25-Math.floor(i%6/3)*25};
+    if(work&&['field','garden','orchard','pasture'].includes(b.kind))return {x:b.x+(i%3-1)*35,y:b.y-25-Math.floor(i%6/3)*25};
     return {x:b.x+((i%5)-2)*25,y:b.y+27+Math.floor(i%10/5)*25};
   }
   private go(a:Resident,kind:BuildingKind,task:AnimalTask){
@@ -142,16 +152,21 @@ export class World {
     const p=this.slot(a,b);a.activityTarget=b.id;this.walk(a,p.x,p.y,task);
   }
   move(ids:string[],x:number,y:number,append=false){
-    ids.forEach((id,i)=>{const a=this.living.find(u=>u.id===id);if(!a)return;
+    ids.forEach((id,i)=>{const a=this.living.find(u=>u.id===id);if(!a||onMission(this,a.id))return;
       const point={x:x+(i%3)*32,y:y+Math.floor(i/3)*30};
       if(append&&a.path.length){if(a.queue.length<16)a.queue.push(point);return}
-      a.queue=[];a.autoBuilder=false;a.job=null;a.target=null;a.wait=0;this.walk(a,point.x,point.y,'idle');
+      a.forced=false;a.queue=[];a.autoBuilder=false;a.job=null;a.target=null;a.wait=0;this.walk(a,point.x,point.y,'idle');
     });
   }
-  assign(ids:string[],job:Exclude<Job,null>,target?:number){
+  assign(ids:string[],job:Exclude<Job,null>,target?:number,force=false){
     for(const a of this.living.filter(a=>ids.includes(a.id))){
+      if(onMission(this,a.id))continue;
+      const kind=this.buildings.find(b=>b.id===target)?.kind;
+      if(!suited(a,job,kind)&&!force){this.notify('Ta praca wymaga przymusu. Wybierz naturalny obowiazek albo potwierdz przymus.');continue}
+      if(['care','study','govern'].includes(job)&&!suited(a,job,kind)){this.notify('Ten obowiazek wymaga zdolnosci gatunku.');continue}
+      a.forced=!suited(a,job,kind)&&force;if(a.forced){a.grievance=clamp(a.grievance+.04);this.regime.integrity=clamp(this.regime.integrity-.01)}
       a.queue=[];a.autoBuilder=false;a.job=job;a.target=target??null;a.wait=0;a.path=[];
-      if(shouldRefuseWork(a)&&job!=='patrol'){a.task='refusing';continue}
+      if(shouldRefuseWork(a)&&job!=='patrol'&&!a.forced){a.task='refusing';continue}
       if(a.carriedGrain+a.load>0){this.go(a,'barn','deposit');continue}
       this.sendToJob(a);
     }
@@ -161,8 +176,9 @@ export class World {
     if(!a.job){a.task='idle';return}
     if(a.job==='build'&&!this.buildings.some(b=>b.progress<1&&b.enabled)){a.job=null;a.task='idle';return}
     if(a.carriedGrain+a.load>0){if(a.carriedGrain>0&&this.economy.grain>=this.capacity-.01||a.load>0&&this.get(a.resource)>=this.storageLimit(a.resource)-.01){a.task='idle';a.wait=4;return}this.go(a,'barn','deposit');return}
+    if(['care','study','govern'].includes(a.job)){const b=roleWorkplace(this,a);if(!b){a.task='idle';a.wait=4;return}a.target=b.id;a.activityTarget=b.id;const p=this.slot(a,b,true);this.walk(a,p.x,p.y,a.job as AnimalTask);return}
     if(a.job==='guard'&&a.patrolCenter){this.walk(a,a.patrolCenter.x,a.patrolCenter.y,'guard');return}
-    const eligible=(b:Building)=>a.job==='build'?b.progress<1&&b.enabled:b.progress>=1&&b.enabled&&(a.job==='harvest'?['field','garden','orchard'].includes(b.kind):a.job==='wood'?b.kind==='lumber'&&b.stock>1e-8:a.job==='stone'?b.kind==='quarry'&&b.stock>1e-8:a.job==='produce'?!!recipes[b.kind]:['house','tower'].includes(b.kind));
+    const eligible=(b:Building)=>a.job==='build'?b.progress<1&&b.enabled:b.progress>=1&&b.enabled&&(a.job==='harvest'?['field','garden','orchard'].includes(b.kind):a.job==='wood'?b.kind==='lumber'&&b.stock>1e-8:a.job==='stone'?b.kind==='quarry'&&b.stock>1e-8:a.job==='produce'?!!recipes[b.kind]&&(a.forced||suited(a,'produce',b.kind)):['house','tower'].includes(b.kind));
     let b=this.buildings.find(b=>b.id===a.target&&eligible(b));
     if(!b){
       b=this.buildings.filter(eligible).sort((b,c)=>{
@@ -190,7 +206,8 @@ export class World {
   }
   order(ids:string[],task:'resting'|'eating'|'idle'){
     for(const a of this.living.filter(a=>ids.includes(a.id))){
-      a.autoBuilder=false;a.queue=[];a.job=null;a.target=null;a.path=[];a.destination=null;a.wait=0;
+      if(onMission(this,a.id))continue;
+      a.forced=false;a.autoBuilder=false;a.queue=[];a.job=null;a.target=null;a.path=[];a.destination=null;a.wait=0;
       if(task==='idle')a.task='idle';else this.go(a,task==='eating'?'barn':'house',task);
     }
   }
@@ -220,16 +237,16 @@ export class World {
   private dispatchBuilders(){
     const site=this.buildings.filter(b=>b.progress<1&&b.enabled).sort((a,b)=>a.priority-b.priority)[0];if(!site)return;
     const current=this.living.filter(a=>a.job==='build');
-    const free=this.living.filter(a=>a.autoBuilder&&!a.job&&a.task==='idle'&&!a.path.length).sort((a,b)=>Math.hypot(a.x-site.x,a.y-site.y)-Math.hypot(b.x-site.x,b.y-site.y));
+    const free=this.living.filter(a=>a.autoBuilder&&suited(a,'build')&&!onMission(this,a.id)&&!a.job&&a.task==='idle'&&!a.path.length).sort((a,b)=>Math.hypot(a.x-site.x,a.y-site.y)-Math.hypot(b.x-site.x,b.y-site.y));
     for(const a of free.slice(0,Math.max(0,2-current.length))){this.assign([a.id],'build',site.id);a.autoBuilder=true}
   }
   staffBuilding(id:number){
     const b=this.buildings.find(b=>b.id===id);if(!b)return false;
-    const job:Job=b.progress<1?'build':recipes[b.kind]?'produce':['field','garden','orchard'].includes(b.kind)?'harvest':b.kind==='lumber'?'wood':b.kind==='quarry'?'stone':null;
+    const job:Job=b.progress<1?'build':recipes[b.kind]?'produce':['field','garden','orchard'].includes(b.kind)?'harvest':b.kind==='lumber'?'wood':b.kind==='quarry'?'stone':['pasture','barn'].includes(b.kind)?'care':null;
     if(!job)return false;
     const workers=this.living.filter(a=>a.target===id&&a.job===job);
     if(workers.length>=3){this.notify('Przy tym stanowisku pracuje juz trzech mieszkancow.');return false}
-    const a=this.living.filter(a=>!workers.includes(a)&&a.job!=='build').sort((a,c)=>(a.job?10000:0)+Math.hypot(a.x-b.x,a.y-b.y)-((c.job?10000:0)+Math.hypot(c.x-b.x,c.y-b.y)))[0];
+    const a=this.living.filter(a=>!workers.includes(a)&&a.job!=='build'&&!onMission(this,a.id)&&suited(a,job,b.kind)).sort((a,c)=>(a.job?10000:0)-aptitude(a,job,b.kind)*1000+Math.hypot(a.x-b.x,a.y-b.y)-((c.job?10000:0)-aptitude(c,job,b.kind)*1000+Math.hypot(c.x-b.x,c.y-b.y)))[0];
     if(!a){this.notify('Brak dostepnych pracownikow.');return false}this.assign([a.id],job,id);return true;
   }
   releaseBuilding(id:number){this.order(this.living.filter(a=>a.target===id).map(a=>a.id),'idle')}
@@ -259,13 +276,14 @@ export class World {
   command(ids:string[],kind:'patrol'|'guard'|'unload'|'build',point?:Point){
     if(kind==='build'){const b=this.buildings.filter(b=>b.progress<1&&b.enabled).sort((a,b)=>a.priority-b.priority)[0];if(b)this.assign(ids,'build',b.id);else this.notify('Nie ma aktywnej budowy.');return}
     for(const a of this.living.filter(a=>ids.includes(a.id))){
-      if(kind==='unload'){a.queue=[];a.job=null;this.go(a,'barn','deposit')}
+      if(onMission(this,a.id))continue;
+      if(kind==='unload'){a.forced=false;a.queue=[];a.job=null;this.go(a,'barn','deposit')}
       else{a.patrolCenter=point??{x:a.x,y:a.y};this.assign([a.id],kind)}
     }
   }
   tradeQuote(resource:Resource){
-    const prices:Record<Resource,number>={grain:15,wood:18,stone:22,gold:0,flour:23,bread:30,tools:38,knowledge:0};
-    return {amount:resource==='tools'?10:40,buy:Math.ceil(prices[resource]*(this.count('market')?.85:1)),sell:Math.floor(prices[resource]*(this.count('market')?.75:.6))};
+    const prices:Record<Resource,number>={grain:15,wood:18,stone:22,gold:0,flour:23,bread:30,tools:38,knowledge:0,milk:20,eggs:20,wool:28,herbs:32};
+    return {amount:resource==='tools'?10:40,buy:Math.ceil(prices[resource]*(this.count('market')?.85:1)*(mandate(this,'commerce')?.85:1)),sell:Math.floor(prices[resource]*(this.count('market')?.75:.6))};
   }
   tradeResource(resource:Resource,buy:boolean){
     if(resource==='knowledge'||resource==='gold')return false;
@@ -284,7 +302,7 @@ export class World {
   }
   setPolicy(policy:'equal'|'privileged'){
     if(this.politics.rationPolicy===policy)return;
-    this.politics.rationPolicy=policy;this.log(policy==='equal'?'Rada przyjela rowne racje dla wszystkich.':'Rada przyznala wieksze racje swiniom i psom.');
+    this.politics.rationPolicy=policy;this.log(policy==='equal'?'Rada przyjela rowne racje dla wszystkich.':'Rada przyznala wieksze racje gatunkowi przywodcy i strazy.');
   }
   feast(){
     if(!this.canPay({grain:40})){this.notify('Wspolny posilek kosztuje 40 zboza.');return false}
@@ -312,18 +330,18 @@ export class World {
     while(this.accumulator>=.05-1e-9&&!this.event&&!this.outcome){this.accumulator=Math.max(0,this.accumulator-.05);this.step(.05)}
   }
   private moveAlongPath(a:Resident,dt:number){
-    let remaining=dt*(a.species==='raven'?86:57)*(1-a.fatigue*.22)*this.navigation.speedAt(a)*(this.research.includes('logistics')?1.1:1);
+    let remaining=dt*(a.species==='raven'?190:57)*(1-a.fatigue*.22)*(a.species==='raven'?1:this.navigation.speedAt(a))*(this.research.includes('logistics')?1.1:1);
     while(remaining>0&&a.path.length){
       const p=a.path[0],dx=p.x-a.x,dy=p.y-a.y,d=Math.hypot(dx,dy);
       if(d<.01){a.path.shift();continue}
       const amount=Math.min(remaining,d),nx=a.x+dx/d*amount,ny=a.y+dy/d*amount;
-      if(!this.navigation.clearPoint({x:nx,y:ny},5)){if(a.destination)this.walk(a,a.destination.x,a.destination.y,a.arrival);return}
+      if(a.species!=='raven'&&!this.navigation.clearPoint({x:nx,y:ny},5)){if(a.destination)this.walk(a,a.destination.x,a.destination.y,a.arrival);return}
       a.x=nx;a.y=ny;a.heading=Math.atan2(dy,dx);a.travel+=amount;remaining-=amount;
       if(amount>=d-.001)a.path.shift();
     }
     // Gentle local separation prevents residents stacking at work and delivery slots.
     for(const other of this.living){
-      if(other.id===a.id)continue;
+      if(other.id===a.id||a.species==='raven'||other.species==='raven'||onMission(this,other.id))continue;
       let dx=a.x-other.x,dy=(a.y-other.y)*1.35,d=Math.hypot(dx,dy);
       if(d>=19)continue;
       if(d<.01){dx=this.units.indexOf(a)%2?1:-1;dy=.5;d=1}
@@ -338,7 +356,7 @@ export class World {
     for(const b of this.buildings){
       if(!b.enabled)continue;
       const workers=this.living.filter(a=>a.target===b.id&&!a.path.length&&a.task===(b.progress<1?'build':'produce')&&Math.hypot(a.x-b.x,a.y-b.y)<170);
-      const effort=Math.min(2.5,workers.reduce((sum,a)=>sum+(a.species==='mule'?1.4:1)*(1-a.fatigue*.35),0))*this.workRate;
+      const effort=Math.min(2.5,workers.reduce((sum,a)=>sum+workEfficiency(a,b.kind)*(1-a.fatigue*.35),0))*this.workRate;
       if(b.progress<1&&effort>0){
         b.progress=Math.min(1,b.progress+dt*effort/(20+buildingDefs[b.kind].width*.04)*(this.research.includes('masonry')?1.3:1));
         if(b.progress>=1){this.built++;this.revision++;this.log('Ukonczono: '+buildingDefs[b.kind].name+'.');for(const a of workers){a.target=null;a.task='idle'}}
@@ -357,14 +375,15 @@ export class World {
       }
     }
     for(const a of this.living){
-      a.hunger=clamp(a.hunger+dt*.0025/(1+this.count('well')*.15));
+      a.hunger=clamp(a.hunger+dt*.0025*(mandate(this,'solidarity')?.85:1)/(1+this.count('well')*.15));
       applyPoliticalPressure(a,this.politics,dt);
       a.grievance=clamp(a.grievance+dt*(this.laws.tax==='high'?.0018:this.laws.tax==='low'?-.001:0));
       if(this.count('infirmary')&&(this.scenario!=='survival'||this.regime.heat>=.4&&this.economy.grain+this.resources.bread>0))a.health=clamp(a.health+dt*.006);
       if(a.health<=0){a.path=[];a.job=null;continue}
+      if(onMission(this,a.id))continue;
       a.wait=Math.max(0,a.wait-dt);
       const enRoute=a.path.length>0,activity=enRoute?a.arrival:a.task;
-      if(a.hunger>.70&&(this.economy.grain>.1||this.resources.bread>.1||a.carriedGrain>.1)&&!['eating','deposit'].includes(activity)){
+      if(a.hunger>.70&&(this.economy.grain>.1||this.resources.bread>.1||this.resources.milk>.1||this.resources.eggs>.1||a.carriedGrain>.1)&&!['eating','deposit'].includes(activity)){
         this.go(a,'barn','eating');
       }else if(a.fatigue>.84&&!['eating','resting','deposit'].includes(activity)){
         this.go(a,'house','resting');
@@ -381,8 +400,9 @@ export class World {
       if(a.task==='eating'){
         if(!this.depositCargo(a))continue;
         const ration=rationCost(a,this.politics)*(this.laws.food==='saving'?.75:this.laws.food==='generous'?1.25:1);
-        if(this.resources.bread>0){const meal=Math.min(this.resources.bread,dt*.65*ration);this.resources.bread-=meal;a.hunger=clamp(a.hunger-meal*.36)}else eatFromStore(a,this.economy,dt,ration);
-        if(a.hunger<.2||this.economy.grain+this.resources.bread<.01){
+        const fresh:Resource=this.resources.milk>0?'milk':'eggs';
+        if(this.get(fresh)>0){const meal=Math.min(this.get(fresh),dt*.65*ration);this.set(fresh,this.get(fresh)-meal);a.hunger=clamp(a.hunger-meal*.3)}else if(this.resources.bread>0){const meal=Math.min(this.resources.bread,dt*.65*ration);this.resources.bread-=meal;a.hunger=clamp(a.hunger-meal*.36)}else eatFromStore(a,this.economy,dt,ration);
+        if(a.hunger<.2||this.economy.grain+this.resources.bread+this.resources.milk+this.resources.eggs<.01){
           if(a.fatigue>.25)this.go(a,'house','resting');else{a.task='idle';a.wait=this.economy.grain<.01?5:0}
         }
         continue;
@@ -390,11 +410,13 @@ export class World {
       if(a.task==='resting'){
         rest(a,dt);if(a.fatigue<=.12){a.task='idle';a.wait=1}continue;
       }
-      if(a.task==='protesting'||shouldRefuseWork(a)){
+      if(a.task==='protesting'||shouldRefuseWork(a)&&!a.forced){
         a.task=shouldProtest(a,this.politics)?'protesting':'refusing';a.fatigue=clamp(a.fatigue-dt*.018);
         if(!shouldRefuseWork(a)&&!shouldProtest(a,this.politics)){a.task='idle';a.wait=1}
         continue;
       }
+      if(a.forced&&['harvest','wood','stone','build','produce','patrol','guard'].includes(a.task)){a.grievance=clamp(a.grievance+dt*.006);a.health=clamp(a.health-dt*.006);a.fatigue=clamp(a.fatigue+dt*.009)}
+      if(['care','study','govern'].includes(a.task)){const b=this.buildings.find(b=>b.id===a.target);if(!b||!b.enabled||Math.hypot(a.x-b.x,a.y-b.y)>170){this.sendToJob(a);continue}tickDuty(this,a,dt*(a.job==='study'&&mandate(this,'learning')?1.25:1));continue}
       if(a.task==='build'||a.task==='produce'){
         const b=this.buildings.find(b=>b.id===a.target);
         if(!b||!b.enabled||a.task==='build'&&b.progress>=1){a.task='idle';a.target=null;continue}
@@ -409,19 +431,19 @@ export class World {
           if(this.economy.grain>=this.capacity&&a.carriedGrain<=.01){a.task='idle';a.wait=5;continue}
           this.economy.fieldGrain=b.stock;
           const fatigue=a.fatigue;
-          const harvested=harvestToInventory(a,this.economy,dt,this.workRate*(this.research.includes('agronomy')?1.2:1)*(1+(b.level-1)*.2)*(b.kind==='garden'?1.2:1));
+          const harvested=harvestToInventory(a,this.economy,dt,this.workRate*workEfficiency(a)*(this.research.includes('agronomy')?1.2:1)*(1+(b.level-1)*.2)*(b.kind==='garden'?1.2:1));
           a.fatigue=clamp(fatigue+(a.fatigue-fatigue)*this.workFatigue);
           b.stock=Math.max(0,b.stock-harvested);
           if(a.carriedGrain>=a.carryCapacity-.01||b.stock<1&&a.carriedGrain>0)this.go(a,'barn','deposit');
         }else{
-          a.resource=a.task;const amount=Math.min(b.stock,a.carryCapacity-a.load,dt*(a.task==='wood'?1.35:1.05)*this.workRate*(a.task==='wood'&&this.laws.forest==='intensive'?1.4:1));a.load+=amount;b.stock-=amount;
+          a.resource=a.task;const amount=Math.min(b.stock,a.carryCapacity-a.load,dt*(a.task==='wood'?1.35:1.05)*this.workRate*workEfficiency(a)*(a.task==='wood'&&this.laws.forest==='intensive'?1.4:1));a.load+=amount;b.stock-=amount;
           a.fatigue=clamp(a.fatigue+dt*.009*this.workFatigue);
           if(a.load>=a.carryCapacity-.001||b.stock<=1e-8&&a.load>0)this.go(a,'barn','deposit');
         }
       }else if(a.task==='guard'){
-        for(const other of this.living)if(Math.hypot(other.x-a.x,other.y-a.y)<160)other.grievance=clamp(other.grievance-dt*.001);
+        for(const other of this.living)if(Math.hypot(other.x-a.x,other.y-a.y)<160)other.grievance=clamp(other.grievance-dt*.001*workEfficiency(a)*(mandate(this,'security')?1.25:1));
       }else if(a.task==='patrol'){
-        for(const other of this.living)if(Math.hypot(other.x-a.x,other.y-a.y)<220)other.grievance=clamp(other.grievance-dt*.001*(1+this.count('tower')));
+        for(const other of this.living)if(Math.hypot(other.x-a.x,other.y-a.y)<220)other.grievance=clamp(other.grievance-dt*.001*workEfficiency(a)*(mandate(this,'security')?1.25:1)*(1+this.count('tower')));
         a.patrolStep++;a.task='idle';a.wait=2.5;
       }else{
         a.fatigue=clamp(a.fatigue-dt*.015);
@@ -429,7 +451,7 @@ export class World {
         else if(!a.job&&a.queue.length&&a.wait<=0){const p=a.queue.shift()!;this.walk(a,p.x,p.y,'idle')}
       }
     }
-    tickRegime(this,dt);tickRegion(this,dt);
+    tickRegime(this,dt);tickRegion(this,dt);tickDiplomacy(this,dt);tickSociety(this);
     this.resources.gold+=dt*({low:.045,normal:.08,high:.16})[this.laws.tax]*this.living.length/12;updateUnrest(this.living,this.politics);
     if(this.living.length<6||this.politics.unrest>.8){this.outcome=this.living.length<6?'Folwark opustoszal':'Rewolucja';this.event=null;this.log('Rada utracila kontrole nad folwarkiem.');return}
     if(this.day!==previousDay){
@@ -442,11 +464,11 @@ export class World {
     }
   }
   snapshot():Save{
-    return JSON.parse(JSON.stringify({version:5,region:this.region,regime:this.regime,roads:this.roads,laws:this.laws,research:this.research,scenario:this.scenario,accumulator:this.accumulator,time:this.time,economy:this.economy,resources:this.resources,politics:this.politics,units:this.units,buildings:this.buildings,journal:this.journal,built:this.built,nextId:this.nextId,event:this.event,outcome:this.outcome}));
+    return JSON.parse(JSON.stringify({version:6,society:this.society,diplomacy:this.diplomacy,region:this.region,regime:this.regime,roads:this.roads,laws:this.laws,research:this.research,scenario:this.scenario,accumulator:this.accumulator,time:this.time,economy:this.economy,resources:this.resources,politics:this.politics,units:this.units,buildings:this.buildings,journal:this.journal,built:this.built,nextId:this.nextId,event:this.event,outcome:this.outcome}));
   }
   restore(raw:unknown){
     const s=raw as Save,finite=(v:unknown)=>typeof v==='number'&&Number.isFinite(v);
-    if(!s||![1,2,3,4,5].includes(s.version)||!Array.isArray(s.units)||!s.units.length||!Array.isArray(s.buildings)||!s.economy||!s.resources||!s.politics||!finite(s.time)||!finite(s.nextId)||!finite(s.built)||!Array.isArray(s.journal))throw Error('Nieprawidlowy zapis gry.');
+    if(!s||![1,2,3,4,5,6].includes(s.version)||!Array.isArray(s.units)||!s.units.length||!Array.isArray(s.buildings)||!s.economy||!s.resources||!s.politics||!finite(s.time)||!finite(s.nextId)||!finite(s.built)||!Array.isArray(s.journal))throw Error('Nieprawidlowy zapis gry.');
     if(s.units.some(a=>!a||!a.id||!Object.hasOwn(speciesNames,a.species)||!finite(a.x)||!finite(a.y)||!finite(a.health)||!finite(a.hunger)||!finite(a.fatigue)||!Array.isArray(a.path)||a.path.some(p=>!finite(p.x)||!finite(p.y))||!Object.keys(taskNames).includes(a.task)))throw Error('Uszkodzone dane mieszkancow.');
     if(s.buildings.some(b=>!b||!Object.hasOwn(buildingDefs,b.kind)||!finite(b.x)||!finite(b.y)||!finite(b.stock)||!finite(b.progress)))throw Error('Uszkodzone dane budynkow.');
     for(const k of ['grain','wood','stone','gold']as Resource[])if(!finite(k==='grain'?s.economy.grain:s.resources[k]))throw Error('Nieprawidlowe zasoby.');
@@ -462,18 +484,21 @@ export class World {
       if(!Array.isArray(s.roads)||s.roads.length>5000||s.roads.some(r=>!r||!Number.isInteger(r.id)||!['dirt','stone'].includes(r.kind)||!Array.isArray(r.points)||r.points.length!==2||r.points.some(p=>!Array.isArray(p)||p.length!==2||!point({x:p[0],y:p[1]}))||!r.cost||Object.entries(r.cost).some(([k,v])=>!['wood','stone'].includes(k)||!nonnegative(v))))throw Error('Nieprawidlowe drogi.');
       if(s.buildings.some(b=>!point(b)||!nonnegative(b.stock)||b.progress<0||b.progress>1||!finite(b.priority)||!nonnegative(b.production)||!Number.isInteger(b.batches)||b.batches<0||![1,2,3].includes(b.level)||typeof b.enabled!=='boolean'))throw Error('Nieprawidlowa produkcja.');
       if(s.units.some(a=>!Array.isArray(a.queue)||a.queue.length>16||a.queue.some(p=>!point(p))||a.destination&&!point(a.destination)||a.patrolCenter&&!point(a.patrolCenter)))throw Error('Nieprawidlowa kolejka rozkazow.');
-      for(const k of Object.keys(resourceNames) as Resource[])if(!nonnegative(k==='grain'?s.economy.grain:s.resources[k]))throw Error('Nieprawidlowe zapasy.');
+      for(const k of Object.keys(resourceNames).filter(k=>s.version>=6||!['milk','eggs','wool','herbs'].includes(k)) as Resource[])if(!nonnegative(k==='grain'?s.economy.grain:s.resources[k]))throw Error('Nieprawidlowe zapasy.');
       const ids=[...s.buildings.map(b=>b.id),...s.roads.map(r=>r.id)];
       if(new Set(ids).size!==ids.length||ids.some(id=>!Number.isInteger(id)||id<0||id>=s.nextId)||!nonnegative(s.time)||!nonnegative(s.accumulator)||s.accumulator>1)throw Error('Nieprawidlowy stan symulacji.');
     }
     if(s.version>=4&&(!validRegime(s.regime)||s.regime.convoys.some(c=>c.id<0||c.id>=s.nextId||s.buildings.some(b=>b.id===c.id)||s.roads.some(r=>r.id===c.id))||[...s.regime.deaths,...s.regime.sold].some(id=>!s.units.some(a=>a.id===id&&a.health===0))))throw Error('Uszkodzony zapis rady lub karawan.');
-    if(s.version===5&&(!validRegion(s.region)||s.region.traffic.some(t=>t.id>=s.nextId||s.regime.convoys.some(c=>c.id===t.id))))throw Error('Uszkodzony zapis regionu.');
+    if(s.version>=5&&(!validRegion(s.region)||s.region.traffic.some(t=>t.id>=s.nextId||s.regime.convoys.some(c=>c.id===t.id))))throw Error('Uszkodzony zapis regionu.');
+    if(s.version>=6&&(!validSociety(s.society,s.units)||!validDiplomacy(s.diplomacy,s.units)||s.units.some(a=>typeof a.forced!=='boolean'||!nonnegative(a.dutyProgress)||a.dutyProgress>60||![null,'harvest','wood','stone','build','produce','patrol','guard','care','study','govern'].includes(a.job)||!Object.hasOwn(resourceNames,a.resource)||!nonnegative(a.load))))throw Error('Uszkodzony zapis specjalizacji lub dyplomacji.');
     const copy=JSON.parse(JSON.stringify(s))as Save;
-    this.time=copy.time;this.accumulator=copy.accumulator??0;this.economy=copy.economy;this.resources=Object.assign({flour:0,bread:0,tools:0,knowledge:0},copy.resources);this.politics=copy.politics;
-    this.regime=s.version>=4?copy.regime:createRegime();this.region=s.version===5?copy.region:createRegion();
+    this.time=copy.time;this.accumulator=copy.accumulator??0;this.economy=copy.economy;this.resources=Object.assign({flour:0,bread:0,tools:0,knowledge:0,milk:0,eggs:0,wool:0,herbs:0},copy.resources);this.politics=copy.politics;
+    this.regime=s.version>=4?copy.regime:createRegime();this.region=s.version>=5?copy.region:createRegion();
+    this.society=s.version>=6?copy.society:createSociety();this.diplomacy=s.version>=6?copy.diplomacy:createDiplomacy();
     this.roads=copy.roads??[];this.laws={...defaultLaws(),...copy.laws};this.research=copy.research??[];this.scenario=copy.scenario??'campaign';this.roadRevision++;
     this.buildings=copy.buildings.map(b=>({...b,enabled:b.enabled??true,priority:b.priority??b.id,production:b.production??0,batches:b.batches??0,level:b.level??1}));this.journal=copy.journal;this.built=copy.built;this.nextId=copy.nextId;this.event=copy.event;this.outcome=copy.outcome;
-    this.units=copy.units.map(a=>({...a,destination:a.destination??a.path.at(-1)??null,activityTarget:a.activityTarget??null,heading:a.heading??0,travel:a.travel??0,wait:a.wait??0,patrolStep:a.patrolStep??0,queue:a.queue??[],patrolCenter:a.patrolCenter??null,autoBuilder:a.autoBuilder??false}));
+    this.units=copy.units.map(a=>({...a,destination:a.destination??a.path.at(-1)??null,activityTarget:a.activityTarget??null,heading:a.heading??0,travel:a.travel??0,wait:a.wait??0,patrolStep:a.patrolStep??0,queue:a.queue??[],patrolCenter:a.patrolCenter??null,autoBuilder:a.autoBuilder??false,forced:a.forced??false,dutyProgress:a.dutyProgress??0}));
+    if(s.version<6){this.society.leaderId=this.living.find(a=>a.name==='Napoleon')?.id??this.living[0]?.id??null;this.politics.leaderSpecies=this.living.find(a=>a.id===this.society.leaderId)?.species;for(const a of this.living){a.autoBuilder=a.species==='mule';if(a.job&&!suited(a,a.job,this.buildings.find(b=>b.id===a.target)?.kind)){a.job=null;a.path=[];a.task='idle';a.destination=null;a.target=null}}}
     this.paused=false;this.speed=1;this.revision++;this.rebuildGrid();
     if((s.version as number)<4){
       for(const a of this.living){

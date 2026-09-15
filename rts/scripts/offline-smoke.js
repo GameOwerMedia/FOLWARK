@@ -9,7 +9,7 @@ async page => {
   await page.getByRole('button',{name:'Wysrodkuj mape',exact:true}).click();
   await page.getByRole('button',{name:'Zapisz gre',exact:true}).click();
   const state=await page.evaluate(()=>({assets:Object.keys(window.FOLWARK_ASSETS).length,units:window.folwark.scene.world.living.length,time:window.folwark.scene.world.time,saved:!!localStorage.getItem('folwark-save'),scenario:window.folwark.scene.world.scenario,saveVersion:JSON.parse(localStorage.getItem('folwark-save')).state.version}));
-  if(state.assets!==24||state.units!==12||!state.saved||state.scenario!=='survival'||state.saveVersion!==5)throw Error(JSON.stringify(state));
+  if(state.assets!==24||state.units!==22||!state.saved||state.scenario!=='survival'||state.saveVersion!==6)throw Error(JSON.stringify(state));
   await page.getByRole('button',{name:'Sasiedzi',exact:true}).click();
   if(await page.locator('.neighbor').count()!==3)throw Error('Offline neighbors missing');
   await page.getByRole('button',{name:'Ksiega folwarku',exact:true}).click();

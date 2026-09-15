@@ -1,10 +1,11 @@
-import type { AnimalState } from './Animal';
+import type { AnimalState, Species } from './Animal';
 
 export type RationPolicy = 'equal' | 'privileged';
 
 export interface PoliticsState {
   rationPolicy: RationPolicy;
   unrest: number;
+  leaderSpecies?: Species;
 }
 
 export const createPolitics = (): PoliticsState => ({
@@ -14,20 +15,20 @@ export const createPolitics = (): PoliticsState => ({
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
-export function isPrivileged(animal: AnimalState): boolean {
-  return animal.species === 'pig' || animal.species === 'dog';
+export function isPrivileged(animal: AnimalState, politics?: PoliticsState): boolean {
+  return animal.species === (politics?.leaderSpecies??'pig') || animal.species === 'dog';
 }
 
 export function rationCost(animal: AnimalState, politics: PoliticsState): number {
   if (politics.rationPolicy === 'equal') return 1;
-  return isPrivileged(animal) ? 1.25 : 0.7;
+  return isPrivileged(animal, politics) ? 1.25 : 0.7;
 }
 
 export function applyPoliticalPressure(animal: AnimalState, politics: PoliticsState, deltaSeconds: number): void {
   const hungerPressure = Math.max(0, animal.hunger - 0.5);
   const fatiguePressure = Math.max(0, animal.fatigue - 0.65);
-  const deprivedByPolicy = politics.rationPolicy === 'privileged' && !isPrivileged(animal) ? 1 : 0;
-  const privilegedBenefit = politics.rationPolicy === 'privileged' && isPrivileged(animal) ? 1 : 0;
+  const deprivedByPolicy = politics.rationPolicy === 'privileged' && !isPrivileged(animal, politics) ? 1 : 0;
+  const privilegedBenefit = politics.rationPolicy === 'privileged' && isPrivileged(animal, politics) ? 1 : 0;
   const recovery = animal.hunger < 0.35 && animal.fatigue < 0.45 ? 1 : 0;
 
   animal.grievance = clamp01(

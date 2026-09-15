@@ -170,7 +170,7 @@ export class FarmScene extends Phaser.Scene {
       }else{view.setCrop();
         if(recipes[b.kind]&&this.world.productionState(b)==='Produkcja')for(let i=0;i<4;i++){const t=(this.world.time*.25+i*.25)%1;this.effects.fillStyle(0xc7ccc0,(1-t)*.32).fillCircle(b.x+Math.sin(t*5)*8,b.y-artFrame.rect[3]/artFrame.rect[2]*buildingDefs[b.kind].width*.78-t*45,3+t*9)}
       }
-      if(['field','garden'].includes(b.kind))view.setDepth(-10);
+      if(['field','garden','pasture'].includes(b.kind))view.setDepth(-10);
       if(b.id===this.selectedBuilding)view.setTint(0xffe7ad);else view.clearTint();
       if(b.kind==='field'){
         const key=b.stock<15?'stubble':'field';
@@ -184,20 +184,23 @@ export class FarmScene extends Phaser.Scene {
         v={sprite:this.art(a.species,a.x,a.y,this.unitWidth(a)),ring:this.add.ellipse(a.x,a.y-2,58,22).setStrokeStyle(2.5,0xf2d877).setDepth(a.y-1),label:this.add.text(a.x,a.y+8,t(a.name),{fontFamily:'Georgia',fontSize:'14px',color:'#fff5d5',stroke:'#20251b',strokeThickness:4}).setOrigin(.5,0),shadow:this.add.ellipse(a.x,a.y-3,40,12,0x151d13,.35)};
         this.unitViews.set(a.id,v);
       }
-      const selected=this.selected.includes(a.id),moving=a.path.length>0;
+      const mission=this.world.diplomacy.missions.find(m=>m.unitId===a.id),flying=a.species==='raven'&&(a.path.length>0||!!mission&&mission.phase!=='negotiating');
+      const selected=this.selected.includes(a.id),moving=a.path.length>0||flying;
       const f=frames[a.species],w=this.unitWidth(a),scale=w/f.rect[2];
       if(moving){
         const phase=this.reducedMotion?0:Math.floor(a.travel/5)%GAIT_FRAMES;
         v.sprite.setTexture('gait-'+a.species,phase).setDisplaySize((f.rect[2]+48)*scale,(f.rect[3]+48)*scale).setPosition(a.x,a.y+24*scale);
         if(Math.abs(Math.cos(a.heading))>.3)v.sprite.setFlipX(Math.cos(a.heading)<0);
-      }else v.sprite.setTexture(f.sheet,a.species).setDisplaySize(w,w*f.rect[3]/f.rect[2]).setPosition(a.x,a.y);
-      const working=['harvest','wood','stone','build','produce'].includes(a.task),phase=(this.reducedMotion?0:this.world.time)*5+this.world.units.indexOf(a);
+      }else{const key=a.species==='raven'?'ravenPerched':a.species==='pig'&&a.name==='Squealer'?'pigWork':a.species;const rest=frames[key];v.sprite.setTexture(rest.sheet,key).setDisplaySize(w,w*rest.rect[3]/rest.rect[2]).setPosition(a.x,a.y-(a.species==='raven'?18:0))}
+      if(a.species==='raven'&&!moving&&!mission&&a.health>0)this.effects.lineStyle(4,0x796044).lineBetween(a.x,a.y,a.x,a.y-18).lineStyle(3,0xb09666).lineBetween(a.x-9,a.y-18,a.x+9,a.y-18);
+      const altitude=flying?48+Math.sin((this.reducedMotion?0:this.world.time)*4)*5:0;if(flying)v.sprite.y-=altitude;
+      const working=['harvest','wood','stone','build','produce','care','study','govern'].includes(a.task),phase=(this.reducedMotion?0:this.world.time)*5+this.world.units.indexOf(a);
       v.sprite.setRotation(!moving&&working?Math.sin(phase)*.028:0);
       if(!moving&&a.task==='resting')v.sprite.setScale(v.sprite.scaleX,v.sprite.scaleY*(.96+Math.sin(phase*.3)*.015));
       if(working&&a.task==='build')this.effects.lineStyle(2,0xe0c88e,.8).lineBetween(a.x+18,a.y-25,a.x+18+Math.sin(phase)*9,a.y-38);
-      v.sprite.setDepth(a.y).setAlpha(a.health>0?1:.25);
+      v.sprite.setDepth(flying?a.y+600:a.y).setVisible(!mission||mission.phase!=='negotiating').setAlpha(a.health>0?1:.25);
       v.ring.setPosition(a.x,a.y-2).setDepth(a.y-.2).setVisible(selected&&a.health>0);
-      v.shadow.setPosition(a.x,a.y-2).setDepth(a.y-.5);
+      v.shadow.setPosition(a.x,a.y-2).setDepth(a.y-.5).setScale(flying?.65:1).setAlpha(flying?.15:.35).setVisible(!mission||mission.phase!=='negotiating');
       v.label.setPosition(a.x,a.y+8).setDepth(a.y+1000).setVisible(selected||a.task==='protesting'||a.task==='refusing');
       v.label.setText(t(a.task==='protesting'?a.name+' / Protest':a.name));
     }

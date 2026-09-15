@@ -1,7 +1,7 @@
 import prepared from './prepared-atlas.json';
 export type Frame = { sheet: string; rect: [number, number, number, number]; sheetSize?:[number,number] };
 export function assetUrl(sheet:string):string {
-  return (window as unknown as {FOLWARK_ASSETS?:Record<string,string>}).FOLWARK_ASSETS?.[sheet] ?? new URL('./assets/'+sheet+'.png',document.baseURI).href;
+  return (window as unknown as {FOLWARK_ASSETS?:Record<string,string>}).FOLWARK_ASSETS?.[sheet] ?? new URL('./assets/'+sheet+'.png?v=society-6',document.baseURI).href;
 }
 export const sheets = ['concept-original','ui-original','resources','animals-original','buildings-original','animals-work','cards-original','buildings-civic','ui-heraldry','animals-special','cards-special','buildings-village','ui-portraits','concept-farm','animals-final','buildings-final','ui-final','cards-final'];
 const f = (sheet: string, ...rect: [number, number, number, number]): Frame => ({ sheet, rect });
@@ -35,6 +35,7 @@ export const sourceFrames: Record<string, Frame> = {
   sheep:f('animals-final',464,573,219,153), hen:f('animals-final',705,936,179,150),
   goat:f('animals-final',847,514,153,215), ram:f('animals-final',999,491,220,249),
   boar:f('animals-final',0,721,267,213), cat:f('animals-final',705,746,207,184),
+  ravenPerched:f('animals-special',808,310,243,191),
   raven:f('animals-final',880,734,225,201), donkey:f('animals-final',47,916,264,170),
   mule:f('animals-final',334,935,316,151), duck:f('animals-final',1090,759,183,173),
   goose:f('animals-final',1230,734,218,198),

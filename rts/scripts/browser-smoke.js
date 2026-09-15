@@ -30,7 +30,7 @@ async page => {
  await page.locator('[data-build="well"]').click();
  const spot=await page.evaluate(()=>{const c=window.folwark.scene.cameras.main;return{x:(1330-c.worldView.x)*c.zoom,y:(1030-c.worldView.y)*c.zoom}});
  await page.locator('#game canvas').click({position:spot});
- await check(()=>window.folwark.scene.world.buildings.length===13,'Construction placement failed');
+ await check(()=>window.folwark.scene.world.buildings.length===14,'Construction placement failed');
  await page.getByRole('button',{name:'Zapisz gre',exact:true}).click();
  const wood=await page.evaluate(()=>window.folwark.scene.world.resources.wood);
  await page.evaluate(()=>{window.folwark.scene.world.resources.wood=0});
