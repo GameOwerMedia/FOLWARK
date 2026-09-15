@@ -1,0 +1,1042 @@
+{
+  "house": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      4,
+      4,
+      298,
+      263
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "barn": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      310,
+      4,
+      271,
+      221
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "granary": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      589,
+      4,
+      201,
+      229
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "mill": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      798,
+      4,
+      212,
+      273
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "smith": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1018,
+      4,
+      270,
+      254
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "bakery": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1296,
+      4,
+      244,
+      255
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "school": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1548,
+      4,
+      193,
+      221
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "library": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1749,
+      4,
+      232,
+      217
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "stage": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      4,
+      285,
+      279,
+      195
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "barracks": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      291,
+      285,
+      231,
+      190
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "kennel": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      530,
+      285,
+      186,
+      149
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "market": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      724,
+      285,
+      362,
+      187
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "bees": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1094,
+      285,
+      191,
+      134
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "garden": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1293,
+      285,
+      273,
+      151
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "vegetables": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1574,
+      285,
+      230,
+      144
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "apple": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1812,
+      285,
+      173,
+      145
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "pear": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      4,
+      488,
+      185,
+      147
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "treeWhite": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      197,
+      488,
+      111,
+      131
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "treePink": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      316,
+      488,
+      94,
+      130
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "treeOrange": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      418,
+      488,
+      100,
+      136
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "pine": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      526,
+      488,
+      105,
+      145
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "field": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      639,
+      488,
+      251,
+      189
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "field2": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      898,
+      488,
+      243,
+      186
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "fieldFence": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1149,
+      488,
+      212,
+      118
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "stubble": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1369,
+      488,
+      256,
+      176
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "soil": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1633,
+      488,
+      256,
+      176
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "well": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      4,
+      685,
+      149,
+      169
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "crates": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      161,
+      685,
+      282,
+      146
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "barrels": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      451,
+      685,
+      161,
+      122
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "logs": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      620,
+      685,
+      127,
+      92
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "fence": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      755,
+      685,
+      171,
+      80
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "fence2": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      934,
+      685,
+      180,
+      78
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "wall": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1122,
+      685,
+      181,
+      151
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "bridge": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1311,
+      685,
+      319,
+      116
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "pond": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1638,
+      685,
+      218,
+      119
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "pond2": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      4,
+      862,
+      251,
+      129
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "reeds": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      263,
+      862,
+      119,
+      113
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "dock": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      390,
+      862,
+      380,
+      122
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "lamp": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      778,
+      862,
+      95,
+      140
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "flag": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      881,
+      862,
+      103,
+      187
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "rocks": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      992,
+      862,
+      133,
+      82
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "flowers": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1133,
+      862,
+      108,
+      109
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "flowersRed": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1249,
+      862,
+      98,
+      92
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "stump": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1355,
+      862,
+      98,
+      108
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "infirmary": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1461,
+      862,
+      264,
+      235
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "tower": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1733,
+      862,
+      208,
+      380
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "pasture": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      4,
+      1250,
+      380,
+      160
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "tent": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      392,
+      1250,
+      321,
+      167
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "pig": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      721,
+      1250,
+      220,
+      236
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "dog": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      949,
+      1250,
+      300,
+      219
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "horse": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1257,
+      1250,
+      268,
+      268
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "cow": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1533,
+      1250,
+      246,
+      213
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "sheep": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1787,
+      1250,
+      235,
+      252
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "hen": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      4,
+      1526,
+      176,
+      212
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "goat": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      188,
+      1526,
+      177,
+      233
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "ram": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      373,
+      1526,
+      252,
+      250
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "boar": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      633,
+      1526,
+      292,
+      185
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "cat": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      933,
+      1526,
+      200,
+      170
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "raven": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1141,
+      1526,
+      195,
+      194
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "donkey": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1344,
+      1526,
+      211,
+      274
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "mule": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1563,
+      1526,
+      263,
+      255
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "duck": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1834,
+      1526,
+      175,
+      172
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "goose": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      4,
+      1808,
+      167,
+      205
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "horseWork": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      179,
+      1808,
+      260,
+      326
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "horseRest": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      447,
+      1808,
+      331,
+      234
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "dogWork": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      786,
+      1808,
+      300,
+      219
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "henWork": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1094,
+      1808,
+      180,
+      181
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "pigWork": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1282,
+      1808,
+      225,
+      230
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "cowWork": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1515,
+      1808,
+      270,
+      207
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "tools": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1793,
+      1808,
+      137,
+      143
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "knowledge": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      4,
+      2142,
+      171,
+      161
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "flour": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      183,
+      2142,
+      81,
+      110
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "wheat": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      272,
+      2142,
+      144,
+      193
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "food": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      424,
+      2142,
+      165,
+      143
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "wood": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      597,
+      2142,
+      174,
+      143
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "stone": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      779,
+      2142,
+      170,
+      142
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "gold": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      957,
+      2142,
+      159,
+      168
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "water": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1124,
+      2142,
+      133,
+      149
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "unrest": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1265,
+      2142,
+      147,
+      161
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  },
+  "law": {
+    "sheet": "sprites-prepared",
+    "rect": [
+      1420,
+      2142,
+      168,
+      160
+    ],
+    "sheetSize": [
+      2048,
+      2339
+    ]
+  }
+}

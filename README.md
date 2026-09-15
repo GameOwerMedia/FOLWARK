@@ -1,4 +1,16 @@
+# Aktualna wersja FOLWARK RTS
+
+Gra w katalogu `rts/`: menu startowe, trzy miejsca zapisu, import/eksport JSON, zapamietywane opcje, scenariusz przetrwania, propaganda oraz autonomiczne farmy z produkcja i karawanami. Wschodni trakt laczy region z miastem poza mapa. Szczegoly uruchomienia i zasad w `rts/README.md`.
+
 # FOLWARK
+
+## Grywalna wersja RTS: Przetrwanie i wladza
+
+Projekt z 18 dostarczonymi grafikami znajduje sie w [rts/](rts/README.md).
+Po `npm ci` i `npm run portable` w tym katalogu mozna otworzyc `rts/portable/GRAJ-FOLWARK.html` bez serwera i internetu.
+Wersja RTS zawiera mape 3600x2400, budowanie drog i 17 rodzajow budowli, kolejki rozkazow, produkcje, badania, potrzeby zwierzat, polityke gospodarcza, wydarzenia i zapisy. Domyslnie dziala scenariusz 10 dni przetrwania: mroz, opal, propaganda, cenzura, przymus i moralne konsekwencje. Trzy sasiednie gospodarstwa lacza drogi i fizyczne karawany. Dawna kampania siedmiodniowa i tryb swobodny pozostaja w Opcjach.
+
+## Oryginalna gra
 
 **A political-systems & ecosystem simulator, after George Orwell.**
 

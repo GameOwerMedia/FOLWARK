@@ -1,0 +1,52 @@
+async page => {
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.setViewportSize({width:1440,height:960});await page.goto('http://127.0.0.1:5177');await page.locator('#loading').waitFor({state:'detached'});await page.locator('[data-menu="options"]').click();await page.locator('[data-pref="language"]').selectOption('pl');await page.locator('[data-menu="main"]').click();
+ await page.locator('[data-menu="new"]').click();await page.locator('[data-scenario="survival"]').click();
+ await page.evaluate(()=>{const s=window.folwark.scene;s.edgeScroll=false;s.world.paused=true;s.cameras.main.setZoom(.85).centerOn(2480,730)});
+ const check=async(fn,msg)=>{if(!await page.evaluate(fn))throw Error(msg)};
+ const at=async(x,y,options={})=>{const p=await page.evaluate(([x,y])=>{const c=window.folwark.scene.cameras.main;return {x:(x-c.worldView.x)*c.zoom,y:(y-c.worldView.y)*c.zoom}},[x,y]);await page.locator('#game canvas').click({position:p,...options})};
+ await page.locator('[data-action="build"]').click();await page.locator('[data-action="road-dirt"]').click();
+ await at(2200,750);await at(2700,750);await page.keyboard.press('Escape');
+ await check(()=>window.folwark.scene.world.roads.length===1,'Road pointer placement');
+ await page.locator('[data-action="build"]').click();await page.locator('[data-action="road-stone"]').click();
+ await at(2200,750);await at(2700,750);await page.keyboard.press('Escape');
+ await check(()=>window.folwark.scene.world.roads.length===2,'Paved upgrade placement');
+ await page.locator('[data-action="pan"]').click();
+ const canvas=await page.locator('#game canvas').boundingBox();
+ const old=await page.evaluate(()=>window.folwark.scene.cameras.main.scrollX);
+ await page.mouse.move(canvas.x+canvas.width*.5,canvas.y+canvas.height*.5);await page.mouse.down();await page.mouse.move(canvas.x+canvas.width*.5-120,canvas.y+canvas.height*.5,{steps:8});await page.mouse.up();
+ await check(()=>window.folwark.scene.mode==='pan','Pan mode');
+ if(Math.abs(await page.evaluate(()=>window.folwark.scene.cameras.main.scrollX)-old)<70)throw Error('Drag camera did not move');
+ await page.keyboard.press('Escape');
+ await page.evaluate(()=>{const s=window.folwark.scene;s.cameras.main.centerOn(2480,730);s.world.resources.wood=800;s.world.resources.stone=600});
+ await page.locator('[data-action="build"]').click();await page.locator('[data-build="mill"]').click();await at(2500,450);
+ await check(()=>window.folwark.scene.world.buildings.at(-1).kind==='mill','Build mill');
+ await page.evaluate(()=>{const s=window.folwark.scene,w=s.world,b=w.buildings.at(-1);w.order(w.living.map(a=>a.id),'idle');const a=w.units[0];a.x=b.x-50;a.y=b.y+30;a.hunger=0;a.fatigue=0;w.assign([a.id],'build',b.id);w.paused=false;for(let i=0;i<100;i++)w.tick(.05);w.paused=true;s.onChange()});
+ await check(()=>{const b=window.folwark.scene.world.buildings.at(-1);return b.progress>0&&b.progress<1},'Builder progress');
+ await page.screenshot({path:'output/playwright/expanded-construction.png'});
+ await page.locator('[data-tab="economy"]').click();
+ if(await page.locator('.queue-row').count()!==1)throw Error('Construction queue UI');
+ await page.evaluate(()=>{const s=window.folwark.scene,w=s.world;w.paused=false;for(let i=0;i<600;i++)w.tick(.05);w.paused=true;s.onChange()});
+ await check(()=>window.folwark.scene.world.buildings.at(-1).progress===1,'Completed mill');
+ await page.locator('.factory-row [data-staff]').click();
+ await check(()=>{const w=window.folwark.scene.world;return w.units.some(a=>a.job==='produce'&&a.target===w.buildings.at(-1).id)},'Factory staffing');
+ await page.locator('[data-tab="council"]').click();await page.locator('[data-law="work"]').selectOption('intensive');await page.locator('[data-law="tax"]').selectOption('low');
+ await page.locator('#trade-resource').selectOption('tools');
+ if(!(await page.locator('#trade-price').innerText()).includes('38'))throw Error('Visible trade quote');
+ await page.locator('[data-action="trade-buy"]').click();
+ await check(()=>window.folwark.scene.world.resources.tools===10&&window.folwark.scene.world.laws.tax==='low','Trade and policy');
+ await page.locator('[data-tab="research"]').click();
+ if(await page.locator('[data-research]:disabled').count()!==3)throw Error('Research gate');
+ await page.locator('[data-action="pan"]').click();
+ await page.screenshot({path:'output/playwright/expanded-desktop.png'});
+ for(const [width,height]of [[390,844],[360,740]]){
+   await page.setViewportSize({width,height});await page.locator('[data-action="build"]').click();
+   if(await page.locator('[data-build]').count()!==17)throw Error('Building catalog');
+   await page.locator('[data-build="stage"]').scrollIntoViewIfNeeded();
+   if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Mobile overflow');
+   await page.screenshot({path:'output/playwright/expanded-mobile-'+width+'.png'});
+   await page.keyboard.press('Escape');
+ }
+ await page.setViewportSize({width:1440,height:960});
+ if(errors.length)throw Error(errors.join('\n'));return {passed:true,roads:2,buildableTypes:17,physicalConstruction:true,trade:true,policies:true,cameraDrag:true,errors};
+}

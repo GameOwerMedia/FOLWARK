@@ -1,268 +1,209 @@
+import {t} from '../i18n';
 import Phaser from 'phaser';
-import { AnimalState, createAnimal } from '../simulation/Animal';
-import {
-  createEconomy,
-  depositGrain,
-  eatFromStore,
-  harvestToInventory,
-  idleRecovery,
-  rest,
-} from '../simulation/Economy';
-import {
-  applyPoliticalPressure,
-  createPolitics,
-  rationCost,
-  shouldProtest,
-  shouldRefuseWork,
-  updateUnrest,
-} from '../simulation/Politics';
+import {saveGame} from './SaveStore';
+import { frames, assetUrl } from './Atlas';
+import { drawTerrain } from './Terrain';
+import { makeGaits, GAIT_FRAMES } from './Gait';
+import { Frontier } from './Frontier';
+import { Atmosphere } from './Atmosphere';
+import { RoadLayer } from './RoadLayer';
+import type { RoadKind } from '../simulation/Development';
+import { recipes } from '../simulation/Development';
+import { decorations, regions, nearRoad } from '../simulation/Landscape';
+import { World, WIDTH, HEIGHT, buildingDefs, speciesNames, type BuildingKind, type Resident } from '../simulation/World';
 
-type Unit = {
-  state: AnimalState;
-  body: Phaser.GameObjects.Container;
-  ring: Phaser.GameObjects.Arc;
-  status: Phaser.GameObjects.Text;
-  assignedHarvest: boolean;
-};
-
+type UnitView={sprite:Phaser.GameObjects.Image;ring:Phaser.GameObjects.Ellipse;label:Phaser.GameObjects.Text;shadow:Phaser.GameObjects.Ellipse};
 export class FarmScene extends Phaser.Scene {
-  private units: Unit[] = [];
-  private selected: Unit[] = [];
-  private economy = createEconomy();
-  private politics = createPolitics();
-  private grainText!: Phaser.GameObjects.Text;
-  private fieldText!: Phaser.GameObjects.Text;
-  private politicsText!: Phaser.GameObjects.Text;
-  private infoText!: Phaser.GameObjects.Text;
-  private rationButton!: Phaser.GameObjects.Text;
-  private wheatZone = new Phaser.Geom.Rectangle(70, 80, 330, 210);
-  private barnZone = new Phaser.Geom.Rectangle(500, 120, 110, 100);
-  private restZone = new Phaser.Geom.Rectangle(500, 360, 150, 100);
-  private protestZone = new Phaser.Geom.Rectangle(675, 300, 185, 90);
-
-  constructor() {
-    super('FarmScene');
+  menuOpen=false;reducedMotion=false;cameraSpeed=.7;autosaveSeconds=20;
+  world=new World('survival'); selected:string[]=['unit-100']; selectedBuilding:number|null=null;
+  mode:'select'|'move'|'build'|'pan'|'road'|'erase-road'|'patrol'|'guard'='select';
+  roadKind:RoadKind='dirt';roadStart:{x:number;y:number}|null=null;edgeScroll=true;
+  private atmosphere!:Atmosphere;
+  private roadLayer!:RoadLayer;private roadVersion=-1;private preview!:Phaser.GameObjects.Graphics;private effects!:Phaser.GameObjects.Graphics; buildKind:BuildingKind='field';
+  onNeighbor=(_id:string)=>{};private frontier!:Frontier;
+  onChange=()=>{}; onReady=()=>{}; private unitViews=new Map<string,UnitView>();
+  private buildingViews=new Map<number,Phaser.GameObjects.Image>(); private decoration:Phaser.GameObjects.Image[]=[];
+  private ghost!:Phaser.GameObjects.Image; private selectionBox!:Phaser.GameObjects.Graphics;
+  private orderMark!:Phaser.GameObjects.Graphics; private clockText!:Phaser.GameObjects.Text;
+  private dragStart:{x:number;y:number;wx:number;wy:number}|null=null; private panning=false;
+  private keys!:Record<string,Phaser.Input.Keyboard.Key>; private renderClock=0; private autosaveClock=0;
+  constructor(){super('FarmScene')}
+  preload(){
+    const label=this.add.text(24,24,t('FOLWARK / wczytywanie atlasow...'), {fontFamily:'Georgia',fontSize:'18px',color:'#dac99b'});
+    this.load.once('complete',()=>label.destroy());
+    this.load.on('progress',(value:number)=>label.setText('FOLWARK / '+Math.round(value*100)+'%'));
+    this.load.on('loaderror',(file:Phaser.Loader.File)=>document.dispatchEvent(new CustomEvent('asset-error',{detail:file.key})));
+    [...new Set(Object.values(frames).map(f=>f.sheet))].forEach(sheet=>this.load.image(sheet,assetUrl(sheet)));
+    this.load.image('meadow-fine',assetUrl('meadow-fine'));
+    this.load.image('terrain-materials',assetUrl('terrain-higgsfield'));
   }
+  create(){
+    for(const[key,f]of Object.entries(frames))this.textures.get(f.sheet).add(key,0,...f.rect);
+    this.cameras.main.setBackgroundColor('#414d35');
+    drawTerrain(this);this.drawDecorations();this.frontier=new Frontier(this);makeGaits(this,Object.keys(speciesNames));
+    this.roadLayer=new RoadLayer(this);this.atmosphere=new Atmosphere(this);this.preview=this.add.graphics().setDepth(5000);this.effects=this.add.graphics().setDepth(3800);
 
-  create() {
-    this.cameras.main.setBackgroundColor('#171208');
-    this.drawFarm();
-    this.spawnDemoAnimals();
-    this.createHud();
-
+    this.ghost=this.art('field',0,0,210).setDepth(4000).setAlpha(.6).setVisible(false);
+    this.selectionBox=this.add.graphics().setDepth(5000);
+    this.orderMark=this.add.graphics().setDepth(4000);
+    this.clockText=this.add.text(1000,1190,'',{fontFamily:'Georgia',fontSize:'12px',color:'#eed6a0'}).setOrigin(.5,1);
     this.input.mouse?.disableContextMenu();
-    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      if (!pointer.rightButtonDown()) return;
-      if (Phaser.Geom.Rectangle.Contains(this.wheatZone, pointer.worldX, pointer.worldY)) this.issueHarvestOrder();
-      else this.issueMove(pointer.worldX, pointer.worldY);
+    this.keys=this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,ESC,SHIFT') as Record<string,Phaser.Input.Keyboard.Key>;
+    this.keys.SPACE.on('down',()=>{if(this.menuOpen||document.querySelector('dialog[open]')||['INPUT','BUTTON','TEXTAREA','SELECT'].includes(document.activeElement?.tagName??''))return;this.world.paused=!this.world.paused;this.onChange()});
+    this.keys.ESC.on('down',()=>{if(this.menuOpen)return;this.cancelMode();document.dispatchEvent(new Event('close-panel'));this.onChange()});
+    const releaseDrag=()=>{this.dragStart=null;this.panning=false;this.selectionBox.clear()};
+    this.input.on('pointerupoutside',releaseDrag);
+    window.addEventListener('blur',releaseDrag);
+    this.events.once('shutdown',()=>window.removeEventListener('blur',releaseDrag));
+    this.input.on('pointerdown',(p:Phaser.Input.Pointer)=>{if(this.menuOpen)return;
+      this.panning=p.middleButtonDown()||this.mode==='pan';
+      this.dragStart={x:p.x,y:p.y,wx:p.worldX,wy:p.worldY};
     });
-  }
-
-  update(_time: number, deltaMs: number) {
-    const dt = Math.min(deltaMs / 1000, 0.1);
-
-    for (const unit of this.units) applyPoliticalPressure(unit.state, this.politics, dt);
-    updateUnrest(this.units.map((u) => u.state), this.politics);
-
-    for (const unit of this.units) {
-      const a = unit.state;
-
-      if (shouldProtest(a, this.politics) && a.task !== 'protesting' && a.task !== 'moving' && a.task !== 'hauling') {
-        unit.assignedHarvest = false;
-        this.sendToProtest(unit);
-      } else if (shouldRefuseWork(a) && a.task === 'harvest') {
-        unit.assignedHarvest = false;
-        a.task = 'refusing';
+    this.input.on('pointermove',(p:Phaser.Input.Pointer)=>{if(this.menuOpen)return;
+      if(this.mode==='build')this.ghost.setPosition(p.worldX,p.worldY).setVisible(true).setTint(this.world.canBuild(this.buildKind,p.worldX,p.worldY)?0xb9e49a:0xe05f54);
+      if(this.mode==='road'&&this.roadStart){const valid=this.world.roadPlan(this.roadKind,this.roadStart,{x:p.worldX,y:p.worldY}).valid;this.preview.clear().lineStyle(34,valid?0xdbc996:0xd25a48,.65).lineBetween(this.roadStart.x,this.roadStart.y,p.worldX,p.worldY)}
+      if(!this.dragStart)return;
+      const c=this.cameras.main;
+      if(p.rightButtonDown()&&Math.hypot(p.x-this.dragStart.x,p.y-this.dragStart.y)>8)this.panning=true;
+      if(this.panning){c.scrollX-=(p.x-p.prevPosition.x)/c.zoom;c.scrollY-=(p.y-p.prevPosition.y)/c.zoom;return}
+      if(p.isDown&&this.mode==='select'&&!p.rightButtonDown()){
+        const s=this.dragStart;this.selectionBox.clear().lineStyle(1.5,0xe8cb78,.9).fillStyle(0xdcc879,.12).fillRect(s.wx,s.wy,p.worldX-s.wx,p.worldY-s.wy).strokeRect(s.wx,s.wy,p.worldX-s.wx,p.worldY-s.wy);
       }
-
-      if (a.task === 'harvest') {
-        harvestToInventory(a, this.economy, dt);
-        if (a.carriedGrain >= a.carryCapacity - 0.01 || this.economy.fieldGrain <= 0) this.sendToBarn(unit);
-        else if (a.hunger >= 0.82) this.sendToBarn(unit, 'eat');
-        else if (a.fatigue >= 0.88) this.sendToRest(unit);
-      } else if (a.task === 'eating') {
-        eatFromStore(a, this.economy, dt, rationCost(a, this.politics));
-        if (a.hunger <= 0.18 || this.economy.grain <= 0) {
-          if (a.fatigue >= 0.7) this.sendToRest(unit);
-          else if (unit.assignedHarvest && this.economy.fieldGrain > 0 && !shouldRefuseWork(a)) this.sendToField(unit);
-          else a.task = shouldRefuseWork(a) ? 'refusing' : 'idle';
-        }
-      } else if (a.task === 'resting') {
-        rest(a, dt);
-        if (a.fatigue <= 0.2) {
-          if (a.hunger >= 0.55 && this.economy.grain > 0) this.sendToBarn(unit, 'eat');
-          else if (unit.assignedHarvest && this.economy.fieldGrain > 0 && !shouldRefuseWork(a)) this.sendToField(unit);
-          else a.task = shouldRefuseWork(a) ? 'refusing' : 'idle';
-        }
-      } else if (a.task === 'protesting') {
-        idleRecovery(a, dt);
-        if (!shouldProtest(a, this.politics) && a.grievance < 0.52) a.task = 'idle';
-      } else {
-        idleRecovery(a, dt);
+    });
+    this.input.on('pointerup',(p:Phaser.Input.Pointer)=>{if(this.menuOpen)return;
+      const start=this.dragStart;this.dragStart=null;this.selectionBox.clear();if(!start||this.panning)return;
+      const distance=Math.hypot(p.x-start.x,p.y-start.y);
+      if(p.rightButtonReleased()){if(this.mode==='road'||this.mode==='build'){this.cancelMode();this.onChange();return}this.contextOrder(p.worldX,p.worldY);return}
+      if(this.mode==='road'){const end={x:p.worldX,y:p.worldY};if(!this.roadStart)this.roadStart=end;else if(this.world.buildRoad(this.roadKind,this.roadStart,end)){this.roadStart=end;this.preview.clear()}this.onChange();return}
+      if(this.mode==='erase-road'){const road=[...this.world.roads].reverse().find(r=>nearRoad(p.worldX,p.worldY,[r.points],26));if(road)this.world.removeRoad(road.id);this.onChange();return}
+      if(this.mode==='patrol'||this.mode==='guard'){this.world.command(this.selected,this.mode,{x:p.worldX,y:p.worldY});this.cancelMode();this.mark(p.worldX,p.worldY);this.onChange();return}
+      if(this.mode==='build'){
+        if(this.world.build(this.buildKind,p.worldX,p.worldY)){this.mode='select';this.ghost.setVisible(false);this.selectedBuilding=this.world.buildings.at(-1)!.id;this.selected=[]}
+      }else if(this.mode==='move'){this.world.move(this.selected,p.worldX,p.worldY,this.keys.SHIFT.isDown);this.mark(p.worldX,p.worldY);this.mode='select'}
+      else if(distance>10){
+        this.selected=this.world.living.filter(a=>a.x>=Math.min(start.wx,p.worldX)&&a.x<=Math.max(start.wx,p.worldX)&&a.y>=Math.min(start.wy,p.worldY)&&a.y<=Math.max(start.wy,p.worldY)).map(a=>a.id);
+        this.selectedBuilding=null;
+      }else{
+        const unit=this.world.living.filter(a=>this.unitViews.get(a.id)?.sprite.getBounds().contains(p.worldX,p.worldY)).sort((a,b)=>b.y-a.y)[0];
+        if(unit){this.selected=this.keys.SHIFT.isDown?[...new Set([...this.selected,unit.id])]:[unit.id];this.selectedBuilding=null}
+        else if(this.frontier.siteAt(p.worldX,p.worldY)){this.onNeighbor(this.frontier.siteAt(p.worldX,p.worldY)!)}
+        else{const b=this.buildingAt(p.worldX,p.worldY);this.selectedBuilding=b?.id??null;this.selected=[]}
       }
-
-      unit.status.setText(this.statusLine(a));
+      this.onChange();
+    });
+    this.input.on('wheel',(p:Phaser.Input.Pointer,_o:unknown,_dx:number,dy:number)=>this.zoomBy(dy>0?-.08:.08,{x:p.x,y:p.y}));
+    this.scale.on('resize',()=>this.fitCamera(false));
+    this.fitCamera(true);
+    this.onReady();document.getElementById('loading')?.remove();
+  }
+  art(key:string,x:number,y:number,width:number){
+    const f=frames[key];return this.add.image(x,y,f.sheet,key).setOrigin(.5,1).setDisplaySize(width,width*f.rect[3]/f.rect[2]).setDepth(y);
+  }
+  private drawDecorations(){
+    for(const d of decorations)this.decoration.push(this.art(d.key,d.x,d.y,d.width));
+  }
+  private buildingAt(x:number,y:number){
+    return [...this.world.buildings].sort((a,b)=>b.y-a.y).find(b=>this.buildingViews.get(b.id)?.getBounds().contains(x,y));
+  }
+  contextOrder(x:number,y:number){
+    if(!this.selected.length)return;
+    const b=this.buildingAt(x,y);
+    if(b&&b.progress<1)this.world.assign(this.selected,'build',b.id);
+    else if(b&&recipes[b.kind])this.world.assign(this.selected,'produce',b.id);
+    else if(b&&['field','garden','orchard'].includes(b.kind))this.world.assign(this.selected,'harvest',b.id);
+    else if(b?.kind==='lumber')this.world.assign(this.selected,'wood',b.id);
+    else if(b?.kind==='quarry')this.world.assign(this.selected,'stone',b.id);
+    else if(b?.kind==='barn')this.world.command(this.selected,'unload');
+    else this.world.move(this.selected,x,y,this.keys.SHIFT.isDown);
+    this.mark(x,y);this.onChange();
+  }
+  private mark(x:number,y:number){
+    this.orderMark.clear().lineStyle(2,0xf0d78c).strokeEllipse(x,y,35,16).lineBetween(x-23,y,x-12,y).lineBetween(x+12,y,x+23,y);
+    this.tweens.killTweensOf(this.orderMark);this.orderMark.setAlpha(1);this.tweens.add({targets:this.orderMark,alpha:0,duration:700});
+  }
+  cancelMode(){this.dragStart=null;this.panning=false;this.selectionBox?.clear();this.mode='select';this.roadStart=null;this.preview?.clear();this.ghost?.setVisible(false)}
+  chooseRoad(kind:RoadKind){this.cancelMode();this.mode='road';this.roadKind=kind;this.onChange()}
+  focusBuilding(id:number){const b=this.world.buildings.find(b=>b.id===id);if(!b)return;this.selected=[];this.selectedBuilding=id;this.cameras.main.centerOn(b.x,b.y);this.onChange()}
+  chooseBuild(kind:BuildingKind){
+    this.cancelMode();
+    this.buildKind=kind;this.mode='build';const f=frames[buildingDefs[kind].art],w=buildingDefs[kind].width;
+    this.ghost.setTexture(f.sheet,buildingDefs[kind].art).setDisplaySize(w,w*f.rect[3]/f.rect[2]);this.onChange();
+  }
+  focus(id:string){const a=this.world.units.find(a=>a.id===id);if(!a)return;this.selected=[id];this.selectedBuilding=null;this.cameras.main.centerOn(a.x,a.y);this.onChange()}
+  center(){this.fitCamera(true)}
+  zoomBy(amount:number,point?:{x:number;y:number}){const c=this.cameras.main,p=point??{x:this.scale.width/2,y:this.scale.height/2},before=c.getWorldPoint(p.x,p.y);c.setZoom(Phaser.Math.Clamp(c.zoom+amount,Math.max(this.scale.width/WIDTH,this.scale.height/HEIGHT),1.7));c.centerOn(before.x-(p.x-this.scale.width/2)/c.zoom,before.y-(p.y-this.scale.height/2)/c.zoom)}
+  private fitCamera(reset:boolean){
+    const c=this.cameras.main;c.setBounds(0,0,WIDTH,HEIGHT);
+    const minimum=Math.max(this.scale.width/WIDTH,this.scale.height/HEIGHT);
+    if(reset)c.setZoom(Math.max(minimum,Math.min(this.scale.width/1540,this.scale.height/1110))).centerOn(870,620);
+    else c.setZoom(Math.max(minimum,c.zoom));
+  }
+  resetViews(){this.cancelMode();this.roadVersion=-1;this.unitViews.forEach(v=>{v.sprite.destroy();v.label.destroy();v.ring.destroy();v.shadow.destroy()});this.unitViews.clear();this.buildingViews.forEach(v=>v.destroy());this.buildingViews.clear()}
+  update(_time:number,delta:number){
+    if(!this.ghost)return;
+    if(!this.menuOpen&&!document.hidden&&!document.querySelector('dialog[open]'))this.world.tick(delta/1000);
+    if(this.roadVersion!==this.world.roadRevision){this.roadLayer.render(this.world.roads);this.roadVersion=this.world.roadRevision}
+    const c=this.cameras.main,step=Math.min(delta,50)*this.cameraSpeed/c.zoom;
+    this.game.canvas.style.cursor=this.mode==='pan'?'grab':this.mode==='select'?'default':'crosshair';
+    if(!this.menuOpen&&!document.querySelector('dialog[open]')){
+      const p=this.input.activePointer;if(this.edgeScroll&&!p.isDown&&this.game.canvas.matches(':hover')&&!p.wasTouch){if(p.x<16)c.scrollX-=step;if(p.x>this.scale.width-16)c.scrollX+=step;if(p.y<16)c.scrollY-=step;if(p.y>this.scale.height-16)c.scrollY+=step}
+      if(this.keys.A.isDown||this.keys.LEFT.isDown)c.scrollX-=step;if(this.keys.D.isDown||this.keys.RIGHT.isDown)c.scrollX+=step;
+      if(this.keys.W.isDown||this.keys.UP.isDown)c.scrollY-=step;if(this.keys.S.isDown||this.keys.DOWN.isDown)c.scrollY+=step;
     }
-
-    this.grainText.setText(`BARN GRAIN: ${this.economy.grain.toFixed(1)}`);
-    this.fieldText.setText(`FIELD GRAIN: ${this.economy.fieldGrain.toFixed(1)}`);
-    this.politicsText.setText(`UNREST: ${Math.round(this.politics.unrest * 100)}%`);
-    this.rationButton.setText(`RATIONS: ${this.politics.rationPolicy === 'equal' ? 'EQUAL' : 'PIGS + DOGS FIRST'}`);
-    this.refreshSelectionInfo();
-  }
-
-  private drawFarm() {
-    const g = this.add.graphics();
-    g.fillStyle(0x2a321b, 1).fillRect(0, 0, 960, 640);
-    g.fillStyle(0x554522, 1).fillRect(this.wheatZone.x, this.wheatZone.y, this.wheatZone.width, this.wheatZone.height);
-    g.fillStyle(0x4a331f, 1).fillRect(this.barnZone.x, this.barnZone.y, this.barnZone.width, this.barnZone.height);
-    g.fillStyle(0x3e2e1d, 1).fillRect(680, 110, 190, 140);
-    g.fillStyle(0x6a552e, 1).fillRect(700, 130, 150, 100);
-    g.fillStyle(0x263b22, 1).fillRect(70, 355, 390, 190);
-    g.fillStyle(0x2f2b25, 1).fillRect(this.restZone.x, this.restZone.y, this.restZone.width, this.restZone.height);
-    g.fillStyle(0x49251f, 0.85).fillRect(this.protestZone.x, this.protestZone.y, this.protestZone.width, this.protestZone.height);
-    g.fillStyle(0x23384a, 1).fillCircle(790, 480, 65);
-
-    this.add.text(95, 94, 'WHEAT FIELD', { color: '#d9c98d', fontSize: '16px' });
-    this.add.text(95, 115, 'Right-click to assign harvest', { color: '#c8b887', fontSize: '11px' });
-    this.add.text(520, 145, 'BARN', { color: '#e9d29b', fontSize: '16px' });
-    this.add.text(509, 166, 'grain / food', { color: '#c5bda8', fontSize: '11px' });
-    this.add.text(715, 148, 'FARMHOUSE', { color: '#e9e3d3', fontSize: '16px' });
-    this.add.text(95, 370, 'PASTURE', { color: '#d9c98d', fontSize: '16px' });
-    this.add.text(530, 390, 'REST YARD', { color: '#d0c7b6', fontSize: '14px' });
-    this.add.text(700, 325, 'PROTEST YARD', { color: '#f09a82', fontSize: '14px' });
-    this.add.text(742, 470, 'WATER', { color: '#d5e1e8', fontSize: '16px' });
-    this.add.text(20, 15, 'FOLWARK RTS — economy creates politics', { color: '#e9e3d3', fontSize: '15px' });
-  }
-
-  private createHud() {
-    this.grainText = this.add.text(690, 20, '', { color: '#f1d36d', fontSize: '14px' });
-    this.fieldText = this.add.text(690, 40, '', { color: '#d9c98d', fontSize: '13px' });
-    this.politicsText = this.add.text(690, 60, '', { color: '#ef8f79', fontSize: '13px' });
-    this.rationButton = this.add.text(690, 82, '', {
-      color: '#f4d783', fontSize: '12px', backgroundColor: '#24180dcc', padding: { x: 8, y: 5 },
-    }).setInteractive({ useHandCursor: true });
-    this.rationButton.on('pointerdown', () => {
-      this.politics.rationPolicy = this.politics.rationPolicy === 'equal' ? 'privileged' : 'equal';
-    });
-
-    this.infoText = this.add.text(610, 535, 'Select an animal.', {
-      color: '#e9e3d3', fontSize: '12px', lineSpacing: 3, backgroundColor: '#161109cc', padding: { x: 10, y: 8 },
-    });
-  }
-
-  private spawnDemoAnimals() {
-    const demo = [
-      createAnimal({ id: 'boxer', name: 'Boxer', species: 'horse', strength: 0.95, loyalty: 0.9, courage: 0.55, carryCapacity: 14, x: 240, y: 360 }),
-      createAnimal({ id: 'napoleon', name: 'Napoleon', species: 'pig', ambition: 0.95, voice: 0.85, carryCapacity: 6, x: 710, y: 285 }),
-      createAnimal({ id: 'bluebell', name: 'Bluebell', species: 'dog', courage: 0.8, loyalty: 0.72, carryCapacity: 7, x: 770, y: 300 }),
-      createAnimal({ id: 'clover', name: 'Clover', species: 'horse', strength: 0.82, loyalty: 0.64, courage: 0.7, grievance: 0.22, carryCapacity: 12, x: 285, y: 390 }),
-    ];
-    for (const state of demo) this.createUnit(state);
-  }
-
-  private createUnit(state: AnimalState) {
-    const colorBySpecies: Record<AnimalState['species'], number> = {
-      pig: 0xc78983, dog: 0x777777, horse: 0x8b5a35, cow: 0xded6c8, sheep: 0xeee8da, hen: 0xb95b35,
-    };
-    const ring = this.add.circle(0, 0, 19).setStrokeStyle(2, 0xd9a441).setVisible(false);
-    const bodyShape = this.add.circle(0, 0, 13, colorBySpecies[state.species]);
-    const label = this.add.text(0, 20, state.name, { color: '#f2ead6', fontSize: '12px' }).setOrigin(0.5, 0);
-    const status = this.add.text(0, 34, this.statusLine(state), { color: '#c5bda8', fontSize: '9px' }).setOrigin(0.5, 0);
-    const body = this.add.container(state.x, state.y, [ring, bodyShape, label, status]);
-    body.setSize(56, 54).setInteractive({ useHandCursor: true });
-    const unit: Unit = { state, body, ring, status, assignedHarvest: false };
-    body.on('pointerdown', (pointer: Phaser.Input.Pointer) => { if (pointer.leftButtonDown()) this.selectOnly(unit); });
-    this.units.push(unit);
-  }
-
-  private selectOnly(unit: Unit) {
-    for (const current of this.selected) current.ring.setVisible(false);
-    this.selected = [unit];
-    unit.ring.setVisible(true);
-    this.refreshSelectionInfo();
-  }
-
-  private issueMove(x: number, y: number) {
-    this.selected.forEach((unit, index) => {
-      unit.assignedHarvest = false;
-      this.moveUnit(unit, x + (index % 3) * 28, y + Math.floor(index / 3) * 28, 'idle');
-    });
-  }
-
-  private issueHarvestOrder() {
-    this.selected.forEach((unit) => {
-      if (shouldRefuseWork(unit.state)) { unit.state.task = 'refusing'; return; }
-      unit.assignedHarvest = true;
-      this.sendToField(unit);
-    });
-  }
-
-  private sendToField(unit: Unit) {
-    if (!unit.assignedHarvest || this.economy.fieldGrain <= 0 || shouldRefuseWork(unit.state)) {
-      unit.state.task = shouldRefuseWork(unit.state) ? 'refusing' : 'idle';
-      return;
+    this.atmosphere.update(this.world,this.reducedMotion);this.frontier.update();
+    for(let i=0;i<this.decoration.length;i++){const key=decorations[i].key;if(['apple','treeOrange','treeWhite','pine','flag','reeds'].includes(key))this.decoration[i].setRotation(Math.sin((this.reducedMotion?0:this.world.time)*1.15+i*2.3)*(key==='flag'?.012:.004))}
+    this.effects.clear();
+    for(const [id,view] of this.buildingViews)if(!this.world.buildings.some(b=>b.id===id)){view.destroy();this.buildingViews.delete(id)}
+    for(const b of this.world.buildings){
+      let view=this.buildingViews.get(b.id);
+      if(!view){view=this.art(buildingDefs[b.kind].art,b.x,b.y,buildingDefs[b.kind].width);this.buildingViews.set(b.id,view)}
+      view.setAlpha(b.enabled?1:.55);
+      const artFrame=frames[buildingDefs[b.kind].art];
+      if(b.progress<1){
+        const f=artFrame.rect,p=Math.max(.07,b.progress),width=buildingDefs[b.kind].width;
+        view.setCrop(0,f[3]*(1-p),f[2],f[3]*p);
+        const g=this.effects,x=b.x-width*.5,y=b.y-8,h=width*.65;
+        g.lineStyle(5,0x796344,.95).lineBetween(x,y,x,y-h).lineBetween(x+width,y,x+width,y-h).lineBetween(x,y-h*.5,x+width,y-h*.5).lineBetween(x,y-h,x+width,y-h);
+        g.lineStyle(2,0xa59567,.7).lineBetween(x,y,x+width,y-h).lineBetween(x+width,y,x,y-h);
+        g.fillStyle(0x182018,.9).fillRect(x,y+15,width,6).fillStyle(0xd8bd77).fillRect(x,y+15,width*b.progress,6);
+        if(this.world.productionState(b)==='Trwa budowa')for(let i=0;i<5;i++){const t=(this.world.time*1.5+i*.2)%1;g.fillStyle(0xd4b67a,(1-t)*.55).fillCircle(x+width*(i+.5)/5,y-5-t*28,2+t*4)}
+      }else{view.setCrop();
+        if(recipes[b.kind]&&this.world.productionState(b)==='Produkcja')for(let i=0;i<4;i++){const t=(this.world.time*.25+i*.25)%1;this.effects.fillStyle(0xc7ccc0,(1-t)*.32).fillCircle(b.x+Math.sin(t*5)*8,b.y-artFrame.rect[3]/artFrame.rect[2]*buildingDefs[b.kind].width*.78-t*45,3+t*9)}
+      }
+      if(['field','garden'].includes(b.kind))view.setDepth(-10);
+      if(b.id===this.selectedBuilding)view.setTint(0xffe7ad);else view.clearTint();
+      if(b.kind==='field'){
+        const key=b.stock<15?'stubble':'field';
+        const f=frames[key],w=buildingDefs.field.width;
+        view.setTexture(f.sheet,key).setDisplaySize(w,w*f.rect[3]/f.rect[2]);
+      }
     }
-    const index = this.units.indexOf(unit);
-    const tx = this.wheatZone.centerX + ((index % 3) - 1) * 50;
-    const ty = this.wheatZone.centerY + Math.floor((index % 6) / 3) * 42;
-    this.moveUnit(unit, tx, ty, 'harvest');
+    for(const a of this.world.units){
+      let v=this.unitViews.get(a.id);
+      if(!v){
+        v={sprite:this.art(a.species,a.x,a.y,this.unitWidth(a)),ring:this.add.ellipse(a.x,a.y-2,58,22).setStrokeStyle(2.5,0xf2d877).setDepth(a.y-1),label:this.add.text(a.x,a.y+8,t(a.name),{fontFamily:'Georgia',fontSize:'14px',color:'#fff5d5',stroke:'#20251b',strokeThickness:4}).setOrigin(.5,0),shadow:this.add.ellipse(a.x,a.y-3,40,12,0x151d13,.35)};
+        this.unitViews.set(a.id,v);
+      }
+      const selected=this.selected.includes(a.id),moving=a.path.length>0;
+      const f=frames[a.species],w=this.unitWidth(a),scale=w/f.rect[2];
+      if(moving){
+        const phase=this.reducedMotion?0:Math.floor(a.travel/5)%GAIT_FRAMES;
+        v.sprite.setTexture('gait-'+a.species,phase).setDisplaySize((f.rect[2]+48)*scale,(f.rect[3]+48)*scale).setPosition(a.x,a.y+24*scale);
+        if(Math.abs(Math.cos(a.heading))>.3)v.sprite.setFlipX(Math.cos(a.heading)<0);
+      }else v.sprite.setTexture(f.sheet,a.species).setDisplaySize(w,w*f.rect[3]/f.rect[2]).setPosition(a.x,a.y);
+      const working=['harvest','wood','stone','build','produce'].includes(a.task),phase=(this.reducedMotion?0:this.world.time)*5+this.world.units.indexOf(a);
+      v.sprite.setRotation(!moving&&working?Math.sin(phase)*.028:0);
+      if(!moving&&a.task==='resting')v.sprite.setScale(v.sprite.scaleX,v.sprite.scaleY*(.96+Math.sin(phase*.3)*.015));
+      if(working&&a.task==='build')this.effects.lineStyle(2,0xe0c88e,.8).lineBetween(a.x+18,a.y-25,a.x+18+Math.sin(phase)*9,a.y-38);
+      v.sprite.setDepth(a.y).setAlpha(a.health>0?1:.25);
+      v.ring.setPosition(a.x,a.y-2).setDepth(a.y-.2).setVisible(selected&&a.health>0);
+      v.shadow.setPosition(a.x,a.y-2).setDepth(a.y-.5);
+      v.label.setPosition(a.x,a.y+8).setDepth(a.y+1000).setVisible(selected||a.task==='protesting'||a.task==='refusing');
+      v.label.setText(t(a.task==='protesting'?a.name+' / Protest':a.name));
+    }
+    this.renderClock+=delta;this.autosaveClock+=delta;
+    if(this.renderClock>200){this.onChange();this.renderClock=0}
+    if(!this.menuOpen&&this.autosaveSeconds>0&&this.autosaveClock>this.autosaveSeconds*1000){try{saveGame(this.world,'auto')}catch{this.world.notify('Nie udalo sie zapisac automatycznie. Wyeksportuj zapis do pliku.')}this.autosaveClock=0}
   }
-
-  private sendToBarn(unit: Unit, purpose: 'deposit' | 'eat' = 'deposit') {
-    const tx = this.barnZone.centerX;
-    const ty = this.barnZone.centerY;
-    this.moveUnit(unit, tx, ty, purpose === 'eat' ? 'eating' : 'idle', () => {
-      depositGrain(unit.state, this.economy);
-      if (purpose === 'eat' || unit.state.hunger >= 0.72) unit.state.task = 'eating';
-      else if (unit.state.fatigue >= 0.82) this.sendToRest(unit);
-      else if (unit.assignedHarvest && this.economy.fieldGrain > 0 && !shouldRefuseWork(unit.state)) this.sendToField(unit);
-    });
-  }
-
-  private sendToRest(unit: Unit) {
-    this.moveUnit(unit, this.restZone.centerX, this.restZone.centerY, 'resting');
-  }
-
-  private sendToProtest(unit: Unit) {
-    const i = this.units.indexOf(unit);
-    const tx = this.protestZone.x + 30 + (i % 3) * 45;
-    const ty = this.protestZone.y + 35 + Math.floor((i % 6) / 3) * 28;
-    this.moveUnit(unit, tx, ty, 'protesting');
-  }
-
-  private moveUnit(unit: Unit, x: number, y: number, onArrivalTask: AnimalState['task'], afterArrival?: () => void) {
-    this.tweens.killTweensOf(unit.body);
-    unit.state.task = unit.state.carriedGrain > 0 ? 'hauling' : 'moving';
-    this.tweens.add({
-      targets: unit.body, x, y,
-      duration: Math.max(120, Phaser.Math.Distance.Between(unit.body.x, unit.body.y, x, y) * 3),
-      ease: 'Linear',
-      onComplete: () => {
-        unit.state.x = x; unit.state.y = y; unit.state.task = onArrivalTask; afterArrival?.();
-      },
-    });
-  }
-
-  private statusLine(state: AnimalState) {
-    const carry = state.carriedGrain > 0.05 ? ` · G ${state.carriedGrain.toFixed(1)}/${state.carryCapacity}` : '';
-    return `${state.task.toUpperCase()} · H ${Math.round(state.hunger * 100)} · F ${Math.round(state.fatigue * 100)} · Gv ${Math.round(state.grievance * 100)}${carry}`;
-  }
-
-  private refreshSelectionInfo() {
-    const unit = this.selected[0];
-    if (!unit) return;
-    const a = unit.state;
-    this.infoText.setText([
-      `${a.name.toUpperCase()} · ${a.species}`,
-      `Task: ${a.task}`,
-      `Assigned: ${unit.assignedHarvest ? 'harvest' : 'none'}`,
-      `Health: ${Math.round(a.health * 100)}`,
-      `Hunger: ${Math.round(a.hunger * 100)}`,
-      `Fatigue: ${Math.round(a.fatigue * 100)}`,
-      `Loyalty: ${Math.round(a.loyalty * 100)}`,
-      `Grievance: ${Math.round(a.grievance * 100)}`,
-      `Rations: ${this.politics.rationPolicy}`,
-    ]);
-  }
+  private unitWidth(a:Resident){return ({horse:66,pig:49,dog:53,cow:63,hen:38,sheep:52,raven:42,donkey:58} as Record<string,number>)[a.species]??49}
 }

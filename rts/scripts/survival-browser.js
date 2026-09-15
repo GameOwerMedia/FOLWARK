@@ -1,0 +1,75 @@
+async page => {
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.setViewportSize({width:1440,height:960});await page.goto('http://127.0.0.1:5177');
+ await page.locator('#loading').waitFor({state:'detached'});await page.locator('[data-menu="options"]').click();await page.locator('[data-pref="language"]').selectOption('pl');await page.locator('[data-menu="main"]').click();
+ await page.locator('[data-menu="new"]').click();await page.locator('[data-scenario="survival"]').click();
+ await page.getByRole('button',{name:'Pauza / wznowienie',exact:true}).click();
+ const check=async(fn,message)=>{if(!await page.evaluate(fn))throw Error(message)};
+ await check(()=>window.folwark.scene.world.scenario==='survival','Wrong initial scenario');
+ await check(()=>document.querySelector('.survival-panel').textContent.includes('Przetrwaj 10 dni'),'Missing objective');
+ await check(()=>{
+  const chapter=document.querySelector('.chapter-header').getBoundingClientRect(),resources=document.querySelector('.resources').getBoundingClientRect(),tools=document.querySelector('.top-tools').getBoundingClientRect(),map=document.querySelector('#world-panel').getBoundingClientRect();
+  return chapter.left>=resources.right&&chapter.right<=tools.left&&chapter.bottom<=map.top&&!document.querySelector('#world-panel #toast')&&!window.folwark.scene.atmosphere.light;
+ },'Map overlays or misplaced chapter');
+ const canvas=await page.locator('#game canvas').boundingBox();
+ await page.mouse.move(canvas.x+canvas.width*.45,canvas.y+canvas.height*.5);await page.mouse.down();
+ await page.mouse.move(canvas.x+canvas.width*.65,canvas.y+canvas.height*.65,{steps:3});
+ await check(()=>window.folwark.scene.selectionBox.commandBuffer.length>0,'Selection test did not draw');
+ await page.mouse.move(canvas.x+canvas.width+25,canvas.y+canvas.height*.5);await page.mouse.up();
+ await check(()=>window.folwark.scene.selectionBox.commandBuffer.length===0&&!window.folwark.scene.dragStart,'Selection rectangle stuck after leaving canvas');
+ await page.locator('[data-action="insulate"]').click();
+ await check(()=>window.folwark.scene.world.regime.insulated,'Insulation failed');
+ await page.getByLabel('Ogrzewanie',{exact:true}).selectOption('high');
+ await check(()=>window.folwark.scene.world.regime.heating==='high','Heating failed');
+ await page.getByRole('button',{name:'Propaganda',exact:true}).click();
+ const grain=await page.evaluate(()=>window.folwark.scene.world.economy.grain);
+ await page.locator('[data-edict="force"]').click();await page.getByRole('button',{name:'Anuluj',exact:true}).last().click();
+ await check(()=>window.folwark.scene.world.regime.forcedUntil===0,'Cancel issued a decree');
+ await page.locator('[data-edict="force"]').click();await page.getByRole('button',{name:'Wydaj rozkaz',exact:true}).click();
+ if(await page.evaluate(()=>window.folwark.scene.world.economy.grain)!==grain-20)throw Error('Decree cost mismatch');
+ await page.evaluate(()=>{window.folwark.scene.world.regime.nextEdict=0;window.folwark.scene.onChange()});
+ await page.locator('[data-edict="propaganda"]').click();
+ await check(()=>window.folwark.scene.world.regime.lies===1,'Propaganda failed');
+ await page.getByLabel('Wolnosc prasy').selectOption('censored');
+ await check(()=>window.folwark.scene.world.regime.press==='censored','Censorship failed');
+ await page.screenshot({path:'output/playwright/propaganda.png'});
+ await page.getByRole('button',{name:'Sasiedzi',exact:true}).click();
+ if(await page.locator('.neighbor').count()!==3)throw Error('Missing neighbors');
+ await page.locator('[data-neighbor-focus="mlyn"]').click();
+ await check(()=>window.folwark.scene.cameras.main.midPoint.y>1500,'Neighbor camera focus failed');
+ const wood=await page.evaluate(()=>window.folwark.scene.world.resources.wood);
+ await page.locator('[data-neighbor="mlyn"][data-diplomacy="trade"]').click();
+ await check(()=>window.folwark.scene.world.regime.convoys.length===1,'No convoy');
+ if(await page.evaluate(()=>window.folwark.scene.world.resources.wood)!==wood)throw Error('Instant delivery');
+ const before=await page.evaluate(()=>window.folwark.scene.world.regime.convoys[0].y);
+ await page.evaluate(()=>{const w=window.folwark.scene.world;w.paused=false;for(let i=0;i<30;i++)w.tick(.1);w.paused=true;window.folwark.scene.onChange()});
+ if(await page.evaluate(()=>window.folwark.scene.world.regime.convoys[0].y)===before)throw Error('Convoy did not move');
+ await page.screenshot({path:'output/playwright/neighbor-farm.png'});
+ await page.locator('[data-action="contract"]').click();await page.getByRole('button',{name:'Odmow',exact:true}).click();
+ await check(()=>window.folwark.scene.world.living.length===12,'Canceled contract removed resident');
+ await page.locator('[data-action="contract"]').click();await page.locator('#contract-unit').selectOption('unit-100');
+ await page.getByRole('button',{name:'Oddaj ludziom bezpowrotnie',exact:true}).click();
+ await check(()=>window.folwark.scene.world.regime.sold.includes('unit-100')&&window.folwark.scene.world.living.length===11,'Contract not enacted');
+ await page.getByRole('button',{name:'Kronika',exact:true}).click();
+ await check(()=>document.querySelector('#inspector').textContent.includes('Bokser zostal oddany ludziom'),'Real chronicle missing');
+ await page.getByRole('button',{name:'Wysrodkuj mape',exact:true}).click();
+ await page.getByRole('button',{name:'Przetrwanie',exact:true}).click();
+ await page.screenshot({path:'output/playwright/survival-desktop.png'});
+ const viewports=[];
+ for(const [width,height]of [[390,844],[360,740],[1280,720],[1920,1080]]){
+  await page.setViewportSize({width,height});await page.waitForTimeout(200);
+  await page.locator('[data-action="center"]').click();
+  await check(()=>document.documentElement.scrollWidth<=innerWidth,'Horizontal overflow');
+  await check(()=>{
+   const rect=id=>document.querySelector(id).getBoundingClientRect(),map=rect('#world-panel'),header=rect('.topbar'),bar=rect('.crisis-bar'),chapter=rect('.chapter-header');
+   return header.bottom<=bar.top+1&&bar.bottom<=map.top+1&&chapter.bottom<=header.bottom&&map.height>=120;
+  },'Header overlaps map');
+  await page.getByRole('button',{name:'Sasiedzi',exact:true}).click();
+  await page.locator('[data-neighbor-focus="czerwony"]').click();
+  await page.getByRole('button',{name:'Przetrwanie',exact:true}).click();
+  await page.locator('[data-action="center"]').click();
+  await page.screenshot({path:'output/playwright/survival-'+width+'.png'});viewports.push(width);
+ }
+ if(errors.length)throw Error(errors.join('\n'));
+ return {survival:true,propaganda:true,coercionConfirmation:true,neighbors:3,physicalConvoys:true,permanentContract:true,viewports,errors};
+}

@@ -14,6 +14,7 @@ export function harvestToInventory(
   animal: AnimalState,
   economy: EconomyState,
   deltaSeconds: number,
+  productivity = 1,
 ): number {
   if (animal.task !== 'harvest' || economy.fieldGrain <= 0) return 0;
   const remainingCapacity = Math.max(0, animal.carryCapacity - animal.carriedGrain);
@@ -23,7 +24,7 @@ export function harvestToInventory(
   const hungerPenalty = 1 - Math.min(0.7, animal.hunger * 0.6);
   const speciesBonus = animal.species === 'horse' ? 1.35 : 1;
   const ratePerSecond = (0.7 + animal.strength * 1.1) * speciesBonus * fatiguePenalty * hungerPenalty;
-  const harvested = Math.min(economy.fieldGrain, remainingCapacity, ratePerSecond * deltaSeconds);
+  const harvested = Math.min(economy.fieldGrain, remainingCapacity, ratePerSecond * deltaSeconds * productivity);
 
   economy.fieldGrain -= harvested;
   animal.carriedGrain += harvested;
