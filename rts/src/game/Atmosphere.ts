@@ -63,8 +63,6 @@ export class Atmosphere {
     }
     if(b.progress>=1){
      this.fences.push(...fenceRun(this.scene,pastureSegments(b)));
-     const f=frames.well;
-     this.fences.push(this.scene.add.image(b.x+122,b.y-100,f.sheet,'well').setOrigin(.5,1).setDisplaySize(40,40*f.rect[3]/f.rect[2]).setDepth(b.y-100));
     }
    }
   }

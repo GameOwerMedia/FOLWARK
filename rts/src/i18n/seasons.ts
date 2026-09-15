@@ -1,5 +1,7 @@
 export const seasonPhrases=`
 Rok|Year
+Glod i zimno zabijaja. Przymus oslabia ciala. Strach moze uciszyc protest, ale nie naprawia krzywdy. Kronika zachowa takze uczciwosc twoich rzadow.|Hunger and cold kill. Coercion weakens bodies. Fear can silence a protest, but cannot repair injustice. The chronicle also records the integrity of your rule.
+Zima ustepuje. Utrzymaj zapasy do odwilzy w dniu 14.|Winter is easing. Keep supplies ready until the thaw on day 14.
 Folwark przez pory roku|A farm through the seasons
 Pokaz zagrozenie|Locate threat
 Pozar stodoly|Barn fire

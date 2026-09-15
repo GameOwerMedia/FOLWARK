@@ -1,12 +1,13 @@
 async page=>{
- const errors=[],failures=[];page.on('pageerror',e=>errors.push(e.message));page.on('requestfailed',r=>failures.push(r.url()));
+ const errors=[],failures=[];page.on('pageerror',e=>errors.push(e.message));page.on('requestfailed',r=>{if(r.url().startsWith('https://gameowermedia.github.io/FOLWARK/'))failures.push(r.url())});
  await page.unrouteAll({behavior:'wait'});await page.setViewportSize({width:1600,height:1000});
  await page.goto('https://gameowermedia.github.io/FOLWARK/');
  await page.locator('#loading').waitFor({state:'detached',timeout:90000});
  const release=await page.locator('script[type="module"]').getAttribute('src');
- if(!release.includes('DKs1NxnZ'))throw Error('Stale release: '+release);
+ if(!release.includes('DztSvpQv'))throw Error('Stale release: '+release);
  await page.locator('[data-menu="new"]').click();await page.locator('[data-scenario="survival"]').click();
  await page.evaluate(()=>{const s=folwark.scene;s.edgeScroll=false;s.autosaveSeconds=0;s.world.paused=true;s.center()});
+ if(!(await page.locator('.survival-panel').innerText()).includes('Hunger and cold kill. Coercion weakens bodies.'))throw Error('Incomplete English survival copy');
  const initial=await page.evaluate(()=>folwark.scene.world.snapshot());
  const views=[];
  for(const [name,day]of [['autumn',0],['winter',6],['spring',13],['summer',20]]){

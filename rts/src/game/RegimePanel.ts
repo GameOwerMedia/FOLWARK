@@ -19,7 +19,7 @@ export function nextObjective(w:World){
  if(!w.count('infirmary'))return 'Zapewnij opieke: zbuduj lecznice.';
  if(w.day>=14)return 'Zabezpiecz plony, opal i zgode wspolnoty przed kolejna zima.';
  if(w.day<7)return 'Zgromadz zywnosc i opal. Mroz nadejdzie w dniu 7.';
- return 'Utrzymaj cieplo i ocal 8 mieszkancow do switu dnia 11.';
+ return w.day>=11?'Zima ustepuje. Utrzymaj zapasy do odwilzy w dniu 14.':'Utrzymaj cieplo i ocal 8 mieszkancow do switu dnia 11.';
 }
 export function survivalPanel(w:World){
  const r=w.regime,fear=w.living.reduce((s,a)=>s+a.fear,0)/Math.max(1,w.living.length);
