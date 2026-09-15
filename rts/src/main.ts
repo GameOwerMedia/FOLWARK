@@ -19,10 +19,5 @@ const game=new Phaser.Game({
   render:{antialias:true,roundPixels:false},input:{activePointers:3},
   audio:{noAudio:true},fps:{target:60,forceSetTimeOut:false},
 });
-document.addEventListener('asset-error',event=>{
-  const loading=document.getElementById('loading');
-  if(loading)loading.innerHTML='<strong>Nie mozna wczytac grafik</strong><span>Sprawdz pliki w katalogu assets i odswiez strone.</span>';
-  console.error('Missing asset',(event as CustomEvent).detail);
-});
 // Live scene access for save diagnostics and deterministic smoke checks.
 Object.assign(window,{folwark:{game,scene}});

@@ -1,7 +1,8 @@
 import {t} from '../i18n';
 import Phaser from 'phaser';
 import {saveGame} from './SaveStore';
-import { frames, assetUrl } from './Atlas';
+import { frames } from './Atlas';
+import {preloadAssets,finishAssetLoading} from './AssetLoading';
 import { drawTerrain } from './Terrain';
 import { makeGaits, GAIT_FRAMES } from './Gait';
 import { Frontier } from './Frontier';
@@ -28,16 +29,9 @@ export class FarmScene extends Phaser.Scene {
   private dragStart:{x:number;y:number;wx:number;wy:number}|null=null; private panning=false;
   private keys!:Record<string,Phaser.Input.Keyboard.Key>; private renderClock=0; private autosaveClock=0;
   constructor(){super('FarmScene')}
-  preload(){
-    const label=this.add.text(24,24,t('FOLWARK / wczytywanie atlasow...'), {fontFamily:'Georgia',fontSize:'18px',color:'#dac99b'});
-    this.load.once('complete',()=>label.destroy());
-    this.load.on('progress',(value:number)=>label.setText('FOLWARK / '+Math.round(value*100)+'%'));
-    this.load.on('loaderror',(file:Phaser.Loader.File)=>document.dispatchEvent(new CustomEvent('asset-error',{detail:file.key})));
-    [...new Set(Object.values(frames).map(f=>f.sheet))].forEach(sheet=>this.load.image(sheet,assetUrl(sheet)));
-    this.load.image('meadow-fine',assetUrl('meadow-fine'));
-    this.load.image('terrain-materials',assetUrl('terrain-higgsfield'));
-  }
-  create(){
+  preload(){preloadAssets(this)}
+  create(){finishAssetLoading(this,()=>this.createFarm())}
+  private createFarm(){
     for(const[key,f]of Object.entries(frames))this.textures.get(f.sheet).add(key,0,...f.rect);
     this.cameras.main.setBackgroundColor('#414d35');
     drawTerrain(this);this.drawDecorations();this.frontier=new Frontier(this);makeGaits(this,Object.keys(speciesNames));
