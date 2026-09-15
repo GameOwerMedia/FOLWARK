@@ -1,3 +1,4 @@
+import {isBarrier,isGate,barrierSegment} from '../simulation/Barriers';
 import Phaser from 'phaser';
 import {pond,decorations} from '../simulation/Landscape';
 import {buildingDefs,type World} from '../simulation/World';
@@ -16,6 +17,7 @@ export class Atmosphere {
  private season='';
  private fences:Phaser.GameObjects.Image[]=[];
  private castShadows:Phaser.GameObjects.Image[]=[];
+ private wildlifeViews=new Map<number,Phaser.GameObjects.Image>();
  private enemies:Phaser.GameObjects.Image[]=[];
  constructor(private scene:Phaser.Scene){
   this.shadows=scene.add.graphics().setDepth(-15);
@@ -41,14 +43,14 @@ export class Atmosphere {
   this.castShadows.push(image);
  }
  update(world:World,reducedMotion=false){
-  const signature=world.season+world.buildings.map(b=>b.id+':'+b.kind+':'+b.x+':'+b.y+':'+(b.progress>=1)).join(',');
+  const signature=world.season+world.buildings.map(b=>b.id+':'+b.kind+':'+b.x+':'+b.y+':'+(b.progress>=1)+':'+(isGate(b.kind)?b.enabled:'')).join(',');
   if(signature!==this.signature){
    this.signature=signature;
    this.season=world.season;drawTerrain(this.scene,world.season,world.buildings);
    this.shadows.clear();this.castShadows.forEach(v=>v.destroy());this.castShadows=[];
    this.fences.forEach(v=>v.destroy());this.fences=[];this.pastureGround.clear();
    const objects=[...decorations.filter(d=>d.radius&&!['fence','fence2'].includes(d.key)).map(d=>({key:d.key,x:d.x,y:d.y,w:d.width})),
-    ...world.buildings.filter(b=>!['field','garden','orchard','quarry','stage','pasture'].includes(b.kind)).map(b=>({key:buildingDefs[b.kind].art,x:b.x,y:b.y,w:buildingDefs[b.kind].width}))];
+    ...world.buildings.filter(b=>!isBarrier(b.kind)&&!['field','garden','orchard','quarry','stage','pasture'].includes(b.kind)).map(b=>({key:buildingDefs[b.kind].art,x:b.x,y:b.y,w:buildingDefs[b.kind].width}))];
    for(const o of objects){
     const tree=['apple','treeWhite','treeOrange','pine'].includes(o.key),key=tree&&world.season==='Zima'?'winterTree':o.key;
     this.shadow(key,o.x,o.y,o.w);
@@ -61,9 +63,14 @@ export class Atmosphere {
      const x=b.x-155+(i*73%310),y=b.y-145+(i*31%145);
      g.lineStyle(1,world.season==='Zima'?0xf0f3ef:0xc3ba77,.42).lineBetween(x,y,x+2,y-3-i%5);
     }
-    if(b.progress>=1){
-     this.fences.push(...fenceRun(this.scene,pastureSegments(b)));
-    }
+
+   }
+  }
+  for(const b of world.buildings.filter(b=>isBarrier(b.kind)&&b.progress>=1)){
+   if(!this.fences.some(v=>v.getData('barrier')===b.id)){
+    const segment=barrierSegment(b);
+    const parts=isGate(b.kind)&&!b.enabled?[[segment[0],[segment[0][0]+(b.kind.endsWith('V')?30:0),segment[0][1]+(b.kind.endsWith('V')?0:30)]]]:[segment];
+    const views=fenceRun(this.scene,parts);views.forEach(v=>v.setData('barrier',b.id));this.fences.push(...views);
    }
   }
   const t=reducedMotion?0:world.time,g=this.water;g.clear();
@@ -82,7 +89,15 @@ export class Atmosphere {
    const x=area.x+((i*131.7+t*15)%Math.max(1,area.width)),y=area.y+((i*71.3+t*9)%Math.max(1,area.height));
    weather.fillStyle(i%2?0xa7823f:0xbcb075,.6).fillEllipse(x,y,4,2);
   }
-  const h=this.hazard;h.clear();const threat=world.threats.active;
+  const h=this.hazard;h.clear();
+  for(const[id,v]of this.wildlifeViews)if(!world.wildlife.predators.some(e=>e.id===id)){v.destroy();this.wildlifeViews.delete(id)}
+  for(const e of world.wildlife.predators){
+   let v=this.wildlifeViews.get(e.id);const f=frames[e.kind],width=e.kind==='wolf'?73:48;
+   if(!v){v=this.scene.add.image(e.x,e.y,f.sheet,e.kind).setOrigin(.5,1).setDisplaySize(width,width*f.rect[3]/f.rect[2]);this.wildlifeViews.set(e.id,v)}
+   v.setPosition(e.x,e.y).setDepth(e.y).setRotation(e.path.length&&!reducedMotion?Math.sin(t*10)*.025:0);if(e.path[0])v.setFlipX(e.path[0].x<e.x);
+   h.lineStyle(1,0xd99461).strokeEllipse(e.x,e.y,45,17);
+  }
+  const threat=world.threats.active;
   if(!threat){this.enemies.forEach(v=>v.destroy());this.enemies=[];return}
   const pulse=reducedMotion?.75:.65+Math.sin(t*4)*.2;
   h.lineStyle(2,0xe29351,pulse).strokeEllipse(threat.x,threat.y,140,60);

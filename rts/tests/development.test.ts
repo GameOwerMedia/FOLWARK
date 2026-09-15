@@ -5,8 +5,8 @@ import {roadCost} from '../src/simulation/Development';
 function advance(w:World,seconds:number){for(let i=0;i<seconds*10;i++){if(w.event)w.choose(w.event.choices.length-1);w.tick(.1)}}
 function quiet(){const w=new World('sandbox');w.order(w.units.map(a=>a.id),'idle');return w}
 function ready(w:World,kind:BuildingKind,x:number,y:number){assert.ok(w.build(kind,x,y));const b=w.buildings.at(-1)!;b.progress=1;return b}
-test('map is four times larger and eastern meadows accept buildings',()=>{
- const w=quiet();assert.equal(WIDTH*HEIGHT,1800*1200*4);assert.ok(w.canBuild('mill',2350,900));assert.ok(w.canBuild('bakery',2650,950));
+test('map has nine times the original area and eastern meadows accept buildings',()=>{
+ const w=quiet();assert.equal(WIDTH*HEIGHT,1800*1200*9);assert.ok(w.canBuild('mill',2350,900));assert.ok(w.canBuild('bakery',2650,950));
  const a=w.units[0];w.move([a.id],2500,850);assert.ok(a.path.length);assert.equal(a.destination?.x,2500);
 });
 test('roads charge once, reject water and duplicate placement, and refund once',()=>{
@@ -73,6 +73,7 @@ test('work and tax policies have measurable economic and social effects',()=>{
 test('research needs a library, costs resources once and benefits new recruits',()=>{
  const w=quiet();w.resources.knowledge=100;w.resources.tools=30;
  assert.equal(w.researchTech('logistics'),false);ready(w,'library',2350,900);
+ assert.ok(w.researchTech('literacy'));
  const carry=w.units[0].carryCapacity;assert.ok(w.researchTech('logistics'));assert.equal(w.units[0].carryCapacity,carry+8);
  const tools=w.resources.tools;assert.equal(w.researchTech('logistics'),false);assert.equal(w.resources.tools,tools);
  assert.equal(w.addUnit('Test','horse',2500,900).carryCapacity,30);

@@ -1,5 +1,9 @@
 import {threatPanel} from './ThreatPanel';
 import {respondToThreat,emergencySupplies} from '../simulation/Threats';
+import {toggleGate} from '../simulation/Barriers';
+import {learnTalent,chooseSystem,type Talent,type System} from '../simulation/Progression';
+import {answerRequest} from '../simulation/ForeignPolitics';
+import {foreignPanel,wildlifePanel} from './StrategyPanel';
 import {rolePanel,electionPanel,embassyPanel} from './SocietyPanel';
 import {roles,suited} from '../simulation/Roles';
 import {nominate,campaign,elect,type Platform} from '../simulation/Society';
@@ -75,11 +79,16 @@ export function attachUI(scene:FarmScene){
   const roleChoices:Record<string,Job>={};let forcedOrder:{id:string;job:Exclude<Job,null>}|null=null;
   scene.onNeighbor=id=>{selectedNeighbor=id;activeTab='neighbors';render()};
   let pendingEdict:Edict|null=null;
-  let tradeChoice:Resource='wood';
-  document.addEventListener('change',e=>{const target=e.target as HTMLInputElement;if(target.dataset.platform){nominate(scene.world,target.dataset.platform,target.value as Platform);render()}if(target.id==='role-job')roleChoices[scene.selected[0]]=target.value as Job;if(target.hasAttribute('data-heating')&&['off','normal','high'].includes(target.value))scene.world.regime.heating=target.value as Heating;if(target.hasAttribute('data-press')){setPress(scene.world,target.value as Press);target.value=scene.world.regime.press}if(target.id==='trade-resource'){tradeChoice=target.value as Resource;el('trade-price').textContent=tradePrice(scene.world,tradeChoice)}if(target.dataset.law){scene.world.setLaw(target.dataset.law as keyof Laws,target.value as Laws[keyof Laws]);render()}if(target.dataset.setting==='edge-scroll')scene.edgeScroll=target.checked});
+  let tradeChoice:Resource='wood';let selectedEnvoy='';
+  document.addEventListener('change',e=>{const target=e.target as HTMLInputElement;if(target.dataset.platform){nominate(scene.world,target.dataset.platform,target.value as Platform);render()}if(target.id==='envoy-unit'){selectedEnvoy=target.value;target.blur();render()}if(target.id==='role-job')roleChoices[scene.selected[0]]=target.value as Job;if(target.hasAttribute('data-heating')&&['off','normal','high'].includes(target.value))scene.world.regime.heating=target.value as Heating;if(target.hasAttribute('data-press')){setPress(scene.world,target.value as Press);target.value=scene.world.regime.press}if(target.id==='trade-resource'){tradeChoice=target.value as Resource;el('trade-price').textContent=tradePrice(scene.world,tradeChoice)}if(target.dataset.law){scene.world.setLaw(target.dataset.law as keyof Laws,target.value as Laws[keyof Laws]);render()}if(target.dataset.setting==='edge-scroll')scene.edgeScroll=target.checked});
   document.addEventListener('click',e=>{
     const target=(e.target as HTMLElement).closest<HTMLButtonElement>('button');if(!target||target.disabled)return;
     if(sound)beep();
+    if(target.dataset.gate)toggleGate(scene.world,Number(target.dataset.gate));
+    if(target.dataset.talent)learnTalent(scene.world,target.dataset.person!,target.dataset.talent as Talent);
+    if(target.dataset.system)chooseSystem(scene.world,target.dataset.system as System);
+    if(target.dataset.foreignAnswer)answerRequest(scene.world,target.dataset.foreignAnswer,target.dataset.accept==='yes');
+    if(target.dataset.predator){const p=scene.world.wildlife.predators.find(p=>p.id===Number(target.dataset.predator));if(p)scene.cameras.main.centerOn(p.x,p.y)}
     if(target.dataset.neighborFocus){selectedNeighbor=target.dataset.neighborFocus;const n=tradeSites.find(n=>n.id===selectedNeighbor);if(n)scene.cameras.main.centerOn(n.x,n.y);activeTab='neighbors'}
     if(target.dataset.cityOrder)sendConvoy(scene.world,'city','trade',undefined,target.dataset.cityOrder as CityOrder);
     if(target.dataset.diplomacy)sendConvoy(scene.world,target.dataset.neighbor!,target.dataset.diplomacy as 'trade'|'aid');
@@ -185,7 +194,7 @@ export function attachUI(scene:FarmScene){
     const roster=w.living.map(a=>a.id+scene.selected.includes(a.id)).join('');
     if(roster!==lastRoster){el('roster').innerHTML=w.living.map(a=>`<button class="resident ${scene.selected.includes(a.id)?'selected':''}" data-unit="${a.id}" title="${a.name} / ${speciesNames[a.species]}" aria-label="Wybierz: ${a.name}">${art('portrait-'+a.species)}</button>`).join('');lastRoster=roster}
     let html='';
-    if(activeTab==='propaganda'){html=propagandaPanel(w)}else if(activeTab==='neighbors'){html=embassyPanel(w)+neighborsPanel(w,selectedNeighbor)}else if(activeTab==='mission'&&w.scenario==='survival'){html=survivalPanel(w)}else if(activeTab==='unit'){
+    if(activeTab==='propaganda'){html=propagandaPanel(w)}else if(activeTab==='neighbors'){html=foreignPanel(w)+embassyPanel(w,selectedEnvoy)+neighborsPanel(w,selectedNeighbor)}else if(activeTab==='mission'&&w.scenario==='survival'){html=wildlifePanel(w)+survivalPanel(w)}else if(activeTab==='unit'){
       const a=w.living.find(a=>a.id===scene.selected[0]),b=w.buildings.find(b=>b.id===scene.selectedBuilding);
       if(a)html=`<div class="unit-summary"><span class="eyebrow">MIESZKANIEC FOLWARKU</span><div class="unit-portrait">${art('portrait-'+a.species)}</div><h2>${escapeHtml(a.name)}</h2><span class="unit-role">${speciesNames[a.species]}</span><div class="current-task"><span class="live-dot"></span>${a.job==='harvest'&&a.task==='idle'&&w.economy.grain>=w.capacity-.1?'Magazyn pelny':taskNames[a.task]}${a.queue.length?' / kolejka '+a.queue.length:''}</div></div>
         <div class="stats">${bar('Zdrowie',a.health*100,'green')}${bar('Glod',a.hunger*100,'gold')}${bar('Zmeczenie',a.fatigue*100,'blue')}${bar('Lojalnosc',a.loyalty*100,'green')}${bar('Krzywda',a.grievance*100,'red')}</div>
@@ -198,7 +207,7 @@ export function attachUI(scene:FarmScene){
     }else html=`<div class="journal"><span class="eyebrow">PAMIETAMY</span><h2>Kronika folwarku</h2>${w.journal.map(entry=>`<article><span>DZIEN ${entry.day}</span><p>${escapeHtml(entry.text)}</p></article>`).join('')}</div>`;
     const context=activeTab+(activeTab==='unit'?(scene.selected[0]??scene.selectedBuilding??''):'');
     if(activeTab==='mission')html=threatPanel(w)+html;
-    if(html!==sidebarSignature&&document.activeElement?.tagName!=='SELECT'){el('inspector').innerHTML=html;sidebarSignature=html}
+    if(html!==sidebarSignature&&document.activeElement?.tagName!=='SELECT'){el('inspector').innerHTML=html;const envoy=el<HTMLSelectElement>('envoy-unit');if(envoy&&[...envoy.options].some(o=>o.value===selectedEnvoy))envoy.value=selectedEnvoy;sidebarSignature=html}
     if(context!==inspectorContext){document.querySelector('.sidebar')!.scrollTop=0;inspectorContext=context}
     el('build-tray').hidden=!tray;
     if(tray){

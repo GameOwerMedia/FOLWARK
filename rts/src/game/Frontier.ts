@@ -1,3 +1,4 @@
+import {frames} from './Atlas';
 import {t} from '../i18n';
 import Phaser from 'phaser';
 import {drawFence} from './Fence';
@@ -11,14 +12,14 @@ export class Frontier {
  private merchants=new Map<number,Phaser.GameObjects.Image>();
  private convoys=new Map<number,Phaser.GameObjects.Image>();
  constructor(private scene:FarmScene){
-  drawFence(scene);
-  for(const gate of gates)this.label(gate.x,gate.y+38,gate.name,12,gate.y+100);
+
+
   scene.art('lamp',cityGate.x-12,cityGate.y-45,52);
   this.label(cityGate.x-120,cityGate.y-85,'DO MIASTA',20,2000);
   for(const n of neighborSites){
    this.sites.push({id:n.id,view:scene.art(n.art,n.x,n.y,230)});
-   this.workers.set(n.id,Array.from({length:3},(_,i)=>scene.art(i===2?'horse':n.id==='dwor'?'pig':'sheep',n.x+i*30,n.y+85,38)));
-   scene.art('barn',n.x-150,n.y+70,150);scene.art('field',n.x+150,n.y+90,175).setDepth(-10);
+   this.workers.set(n.id,Array.from({length:3},(_,i)=>scene.art(i===2?'horse':n.id==='dwor'?'human':'sheep',n.x+i*65,n.y+130,i===2?66:n.id==='dwor'?45:52)));
+   scene.art('barn',n.x-190,n.y+70,245);scene.art('field',n.x+210,n.y+90,260).setDepth(-10);
    this.label(n.x,n.y+155,n.name.toUpperCase(),19,n.y+500);
   }
  }
@@ -34,10 +35,14 @@ export class Frontier {
     const q=p<.5?p*2:2-p*2;
     view.setPosition(site.x-120+q*240,site.y+112+Math.sin(q*Math.PI)*24).setDepth(view.y).setFlipX(p>.5);
     view.setAlpha(i<n.workers?1:.35);
-    const texture='gait-'+(i===2?'horse':site.id==='dwor'?'pig':'sheep');
+    const farm=this.scene.world.foreign.farms.find(f=>f.id===n.id)!;
+    const key=i===2?'horse':farm.government==='human'?'human':'sheep',width=i===2?66:key==='human'?45:52;
+    view.setVisible(!farm.collapsed);
+    if(key==='human'){const f=frames.human;view.setTexture(f.sheet,'human').setDisplaySize(width,width*f.rect[3]/f.rect[2])}
+    const texture='gait-'+key;
     if(this.scene.textures.exists(texture)){
      view.setTexture(texture,working&&!this.scene.reducedMotion?Math.floor(p*60)%12:0);
-     view.setDisplaySize(38,38*view.frame.height/view.frame.width);
+     const f=frames[key],scale=width/f.rect[2];view.setDisplaySize((f.rect[2]+48)*scale,(f.rect[3]+48)*scale);
     }
    });
   }

@@ -1,3 +1,4 @@
+import {isBarrier} from '../simulation/Barriers';
 import Phaser from 'phaser';
 import type {Season} from '../simulation/Seasons';
 import type {Building} from '../simulation/World';
@@ -6,7 +7,11 @@ import { WORLD_WIDTH as W, WORLD_HEIGHT as H, pond, roads,decorations } from '..
 export function drawTerrain(scene:Phaser.Scene,season:Season='Jesien',buildings:Building[]=[]){
   const source=scene.textures.get('terrain-materials').getSourceImage() as HTMLImageElement;
   const canvas=(w=W,h=H)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c};
-  const base=canvas(),ctx=base.getContext('2d')!;
+  const renderer=scene.game.renderer as Phaser.Renderer.WebGL.WebGLRenderer;
+  const limit=renderer.gl?Math.min(4096,renderer.gl.getParameter(renderer.gl.MAX_TEXTURE_SIZE)):4096;
+  const scale=Math.min(1,limit/W,limit/H);
+  const base=canvas(Math.round(W*scale),Math.round(H*scale)),ctx=base.getContext('2d')!;
+  ctx.scale(base.width/W,base.height/H);
   const materials=Array.from({length:4},(_,i)=>{
     const c=canvas(384,384),g=c.getContext('2d')!,sw=source.width/2,sh=source.height/2;
     if(i===0)g.drawImage(scene.textures.get('meadow-fine').getSourceImage() as HTMLImageElement,0,0,384,384);
@@ -44,7 +49,7 @@ export function drawTerrain(scene:Phaser.Scene,season:Season='Jesien',buildings:
     }
   });
   layer(materials[1],g=>{
-    for(const b of buildings.filter(b=>!['field','pasture','lumber','quarry','orchard'].includes(b.kind))){
+    for(const b of buildings.filter(b=>!isBarrier(b.kind)&&!['field','pasture','lumber','quarry','orchard'].includes(b.kind))){
       const x=b.x,y=b.y+10,r=b.kind==='barn'?165:115;
       const fade=g.createRadialGradient(x,y,35,x,y,r);fade.addColorStop(0,'#fff');fade.addColorStop(1,'#fff0');
       g.fillStyle=fade;g.fillRect(x-r,y-r*.6,r*2,r*1.3);
@@ -94,6 +99,6 @@ export function drawTerrain(scene:Phaser.Scene,season:Season='Jesien',buildings:
     const target=existing.getSourceImage() as HTMLCanvasElement;target.getContext('2d')!.drawImage(base,0,0);(existing as Phaser.Textures.CanvasTexture).refresh();
   }else{
     scene.textures.addCanvas('terrain',base);
-    scene.add.image(0,0,'terrain').setName('world-terrain').setOrigin(0).setDepth(-100);
+    scene.add.image(0,0,'terrain').setName('world-terrain').setDisplaySize(W,H).setOrigin(0).setDepth(-100);
   }
 }

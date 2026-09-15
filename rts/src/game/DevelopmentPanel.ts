@@ -1,10 +1,14 @@
+import {isBarrier,isGate} from '../simulation/Barriers';
+import {systemPanel} from './StrategyPanel';
+import {getLanguage,t} from '../i18n';
 import { atlasStyle } from './Atlas';
 import { buildingDefs, type World, type Building, type Resource } from '../simulation/World';
-import { recipes, resourceNames, resourceArt, technologies, type Technology } from '../simulation/Development';
+import { recipes, resourceNames, resourceArt, technologies, branches, prerequisites, type Technology } from '../simulation/Development';
 const icon=(name:string)=>'<i data-lucide="'+name+'"></i>';
 const art=(key:string)=>'<span class="atlas" style="'+atlasStyle(key)+'"></span>';
 const cost=(c:Partial<Record<Resource,number>>)=>Object.entries(c).map(([k,v])=>v+' '+resourceNames[k as Resource]).join(' / ');
 export function buildingControls(w:World,b:Building){
+ if(isBarrier(b.kind))return '<div class="building-controls"><meter max="1" value="'+b.progress+'"></meter>'+(b.progress<1?'<button data-staff="'+b.id+'" title="Dodaj budowniczego">'+icon('user-plus')+'</button><button data-cancel-build="'+b.id+'" title="Anuluj budowe">'+icon('x')+'</button>':isGate(b.kind)?'<button class="wide-action" data-gate="'+b.id+'">'+icon(b.enabled?'door-open':'door-closed')+(getLanguage()==='pl'?(b.enabled?'Otworz brame':'Zamknij brame'):(b.enabled?'Open gate':'Close gate'))+'</button>':'')+'</div>';
  const workers=w.living.filter(a=>a.target===b.id&&a.job),recipe=recipes[b.kind];
  return '<div class="building-controls"><div class="detail-row"><span>Poziom '+b.level+'</span><span>'+workers.length+' pracownikow</span></div>'+
  (b.progress<1?'<meter max="1" value="'+b.progress+'"></meter><p>'+w.productionState(b)+'</p><div class="compact-actions"><button data-staff="'+b.id+'" title="Dodaj budowniczego">'+icon('user-plus')+'</button><button data-priority="'+b.id+'" title="Buduj jako pierwsze">'+icon('arrow-up-to-line')+'</button><button data-cancel-build="'+b.id+'" title="Anuluj budowe, zwrot 80% pozostalych materialow">'+icon('x')+'</button></div>':
@@ -21,7 +25,7 @@ export function economyPanel(w:World){
 }
 export function researchPanel(w:World){
  return '<div class="research-panel"><span class="eyebrow">ROZWOJ WSPOLNOTY</span><h2>Wiedza zmienia prace</h2><div class="detail-row"><span>Biblioteki: '+w.count('library')+'</span><b>'+Math.floor(w.resources.knowledge)+' wiedzy</b></div>'+
- (Object.keys(technologies) as Technology[]).map(key=>{const t=technologies[key],done=w.research.includes(key);return '<article><h3>'+t.name+'</h3><p>'+t.description+'</p><small>'+cost(t.cost)+'</small><button data-research="'+key+'" '+(done||!w.count('library')||!w.canPay(t.cost)?'disabled':'')+'>'+icon(done?'check':'book-open')+(done?'Ukonczone':!w.count('library')?'Wymaga biblioteki':'Rozpocznij badanie')+'</button></article>'}).join('')+'</div>';
+ Object.entries(branches).map(([branch,keys])=>'<h3>'+t(branch)+'</h3><div class="tech-branch">'+keys.map(key=>{const t=technologies[key],done=w.research.includes(key);return '<article class="tech-node"><h3>'+t.name+'</h3><p>'+t.description+'</p><small>'+cost(t.cost)+'</small><small>'+((prerequisites[key]??[]).map(k=>' &gt; '+technologies[k].name).join(''))+'</small><button data-research="'+key+'" '+(done||!w.count('library')||!w.canPay(t.cost)||(prerequisites[key]??[]).some(k=>!w.research.includes(k))?'disabled':'')+'>'+icon(done?'check':'book-open')+(done?'Ukonczone':!w.count('library')?'Wymaga biblioteki':'Rozpocznij badanie')+'</button></article>'}).join('')+'</div>').join('')+systemPanel(w)+'</div>';
 }
 export function tradePrice(w:World,k:Resource){const q=w.tradeQuote(k);return q.amount+' '+resourceNames[k]+' / kupno: '+q.buy+' monet / sprzedaz: '+q.sell+' monet'}
 export function lawsPanel(w:World,choice:Resource='wood'){

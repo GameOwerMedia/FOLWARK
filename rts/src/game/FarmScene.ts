@@ -1,3 +1,5 @@
+import {isBarrier,isGate,barrierSegment} from '../simulation/Barriers';
+import {prepareWildlifeArt} from './WildlifeArt';
 import {t} from '../i18n';
 import Phaser from 'phaser';
 import {saveGame} from './SaveStore';
@@ -34,6 +36,7 @@ export class FarmScene extends Phaser.Scene {
   preload(){preloadAssets(this)}
   create(){finishAssetLoading(this,()=>this.createFarm())}
   private createFarm(){
+    prepareWildlifeArt(this);
     for(const[key,f]of Object.entries(frames))this.textures.get(f.sheet).add(key,0,...f.rect);
     this.cameras.main.setBackgroundColor('#414d35');
     drawTerrain(this,this.world.season,this.world.buildings);this.drawDecorations();this.frontier=new Frontier(this);makeGaits(this,Object.keys(speciesNames));
@@ -56,7 +59,7 @@ export class FarmScene extends Phaser.Scene {
       this.dragStart={x:p.x,y:p.y,wx:p.worldX,wy:p.worldY};
     });
     this.input.on('pointermove',(p:Phaser.Input.Pointer)=>{if(this.menuOpen)return;
-      if(this.mode==='build')this.ghost.setPosition(p.worldX,p.worldY).setVisible(true).setTint(this.world.canBuild(this.buildKind,p.worldX,p.worldY)?0xb9e49a:0xe05f54);
+      if(this.mode==='build'){const x=isBarrier(this.buildKind)?Math.round(p.worldX/50)*50:p.worldX,y=isBarrier(this.buildKind)?Math.round(p.worldY/50)*50:p.worldY;this.ghost.setPosition(x,y).setVisible(true).setTint(this.world.canBuild(this.buildKind,x,y)?0xb9e49a:0xe05f54);}
       if(this.mode==='road'&&this.roadStart){const valid=this.world.roadPlan(this.roadKind,this.roadStart,{x:p.worldX,y:p.worldY}).valid;this.preview.clear().lineStyle(34,valid?0xdbc996:0xd25a48,.65).lineBetween(this.roadStart.x,this.roadStart.y,p.worldX,p.worldY)}
       if(!this.dragStart)return;
       const c=this.cameras.main;
@@ -74,7 +77,7 @@ export class FarmScene extends Phaser.Scene {
       if(this.mode==='erase-road'){const road=[...this.world.roads].reverse().find(r=>nearRoad(p.worldX,p.worldY,[r.points],26));if(road)this.world.removeRoad(road.id);this.onChange();return}
       if(this.mode==='patrol'||this.mode==='guard'){this.world.command(this.selected,this.mode,{x:p.worldX,y:p.worldY});this.cancelMode();this.mark(p.worldX,p.worldY);this.onChange();return}
       if(this.mode==='build'){
-        if(this.world.build(this.buildKind,p.worldX,p.worldY)){this.mode='select';this.ghost.setVisible(false);this.selectedBuilding=this.world.buildings.at(-1)!.id;this.selected=[]}
+        if(this.world.build(this.buildKind,isBarrier(this.buildKind)?Math.round(p.worldX/50)*50:p.worldX,isBarrier(this.buildKind)?Math.round(p.worldY/50)*50:p.worldY)){if(!isBarrier(this.buildKind)){this.mode='select';this.ghost.setVisible(false);}this.selectedBuilding=this.world.buildings.at(-1)!.id;this.selected=[]}
       }else if(this.mode==='move'){this.world.move(this.selected,p.worldX,p.worldY,this.keys.SHIFT.isDown);this.mark(p.worldX,p.worldY);this.mode='select'}
       else if(distance>10){
         this.selected=this.world.living.filter(a=>a.x>=Math.min(start.wx,p.worldX)&&a.x<=Math.max(start.wx,p.worldX)&&a.y>=Math.min(start.wy,p.worldY)&&a.y<=Math.max(start.wy,p.worldY)).map(a=>a.id);
@@ -99,7 +102,7 @@ export class FarmScene extends Phaser.Scene {
     for(const d of decorations)this.decoration.push(this.art(d.key,d.x,d.y,d.width));
   }
   private buildingAt(x:number,y:number){
-    return [...this.world.buildings].sort((a,b)=>b.y-a.y).find(b=>this.buildingViews.get(b.id)?.getBounds().contains(x,y));
+    return [...this.world.buildings].sort((a,b)=>b.y-a.y).find(b=>isBarrier(b.kind)?(b.kind.endsWith('V')?Math.abs(x-b.x)<20&&Math.abs(y-b.y)<65:Math.abs(x-b.x)<55&&Math.abs(y-b.y)<40):this.buildingViews.get(b.id)?.getBounds().contains(x,y));
   }
   contextOrder(x:number,y:number){
     if(!this.selected.length)return;
@@ -123,7 +126,7 @@ export class FarmScene extends Phaser.Scene {
   chooseBuild(kind:BuildingKind){
     this.cancelMode();
     this.buildKind=kind;this.mode='build';const f=frames[buildingDefs[kind].art],w=buildingDefs[kind].width;
-    this.ghost.setTexture(f.sheet,buildingDefs[kind].art).setDisplaySize(w,w*f.rect[3]/f.rect[2]);this.onChange();
+    this.ghost.setTexture(f.sheet,buildingDefs[kind].art).setOrigin(.5,1).setDisplaySize(w,w*f.rect[3]/f.rect[2]);if(isBarrier(kind)&&kind.endsWith('V'))this.ghost.setDisplaySize(26,145).setOrigin(.5,.65);this.onChange();
   }
   focus(id:string){const a=this.world.units.find(a=>a.id===id);if(!a)return;this.selected=[id];this.selectedBuilding=null;this.cameras.main.centerOn(a.x,a.y);this.onChange()}
   center(){this.fitCamera(true)}
@@ -162,6 +165,14 @@ export class FarmScene extends Phaser.Scene {
     for(const b of this.world.buildings){
       let view=this.buildingViews.get(b.id);
       if(!view){view=this.art(buildingDefs[b.kind].art,b.x,b.y,buildingDefs[b.kind].width);this.buildingViews.set(b.id,view)}
+      if(isBarrier(b.kind)){
+        view.setVisible(b.progress<1).setAlpha(.3+b.progress*.7);
+        if(b.kind.endsWith('V'))view.setDisplaySize(26,145);else view.setDisplaySize(110,48);
+        if(b.progress<1)this.effects.lineStyle(3,0xb4a36b).lineBetween(b.x-35,b.y+8,b.x-35+b.progress*70,b.y+8);
+        if(isGate(b.kind))this.effects.lineStyle(2,b.enabled?0xc2654f:0x7bb485).strokeEllipse(b.x,b.y,26,12);
+        if(b.id===this.selectedBuilding)this.effects.lineStyle(2,0xf2d877).strokeEllipse(b.x,b.y,105,28);
+        continue;
+      }
       const baseKey=buildingDefs[b.kind].art,base=frames[baseKey],baseWidth=buildingDefs[b.kind].width;
       if(!['field','garden','orchard','lumber','pasture'].includes(b.kind)){
         view.setTexture(this.world.season==='Zima'?snowTexture(this,baseKey):base.sheet,this.world.season==='Zima'?undefined:baseKey).setDisplaySize(baseWidth,baseWidth*base.rect[3]/base.rect[2]);
@@ -223,6 +234,7 @@ export class FarmScene extends Phaser.Scene {
       v.ring.setPosition(a.x,a.y-2).setDepth(a.y-.2).setVisible(selected&&a.health>0);
       v.shadow.setPosition(a.x,a.y-2).setDepth(a.y-.5).setScale(flying?.65:1).setAlpha(flying?.15:.35).setVisible(!mission||mission.phase!=='negotiating');
       v.label.setPosition(a.x,a.y+8).setDepth(a.y+1000).setVisible(selected||a.task==='protesting'||a.task==='refusing');
+      if(this.world.wildlife.escaped.includes(a.id)){v.sprite.setVisible(false);v.shadow.setVisible(false);v.ring.setVisible(false);v.label.setVisible(false)}
       v.label.setText(t(a.task==='protesting'?a.name+' / Protest':a.name));
     }
     this.viewCenter={x:c.scrollX+c.width/2,y:c.scrollY+c.height/2};

@@ -173,3 +173,8 @@ Sprawdzone widoki: 1920x1080, 1440x960, 1280x720, 390x844 i 360x740; kontrola pi
 Plik offline sprawdzony przez file:// z zablokowanymi polaczeniami HTTP i HTTPS.
 
 To lokalna, grywalna pierwsza wersja scenariusza RTS. Nie zawiera wszystkich systemow dawnej gry z glownego index.html, np. wyborow, konstytucji czy walki z ludzmi.
+
+## Frontiers update
+
+Buildable fences and gates, wildlife, political missions, larger region and progression trees:
+see [FRONTIERS.md](docs/FRONTIERS.md). Saves now use version 8, with migration from earlier releases.

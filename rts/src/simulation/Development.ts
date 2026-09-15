@@ -13,9 +13,19 @@ export const recipes:Partial<Record<BuildingKind,{input:Partial<Record<Resource,
  bees:{input:{},output:{bread:2},seconds:16},
 };
 export const technologies={
+ literacy:{name:'Powszechna nauka',cost:{knowledge:10,gold:10},description:'+15% pracy szkol i warsztatow'},
+ irrigation:{name:'Nawadnianie',cost:{knowledge:45,tools:10},description:'+30% odrostu upraw'},
+ preservation:{name:'Zapasy zimowe',cost:{knowledge:40,wood:25},description:'+200 miejsca na zapasy'},
+ printing:{name:'Drukarnia',cost:{knowledge:25,tools:4},description:'Odblokowuje misje propagandowe swin'},
+ solidarity:{name:'Solidarnosc ponad granicami',cost:{knowledge:45,gold:30},description:'Odblokowuje rewolucje i federacje'},
+ charter:{name:'Karta wspolnoty',cost:{knowledge:35,gold:20},description:'Wybor ustroju wspolnoty'},
+ husbandry:{name:'Opieka nad stadami',cost:{knowledge:20,grain:30},description:'Glod narasta o 15% wolniej'},
+ kennels:{name:'Szkolenie psow',cost:{knowledge:30,grain:20},description:'+40% obrony psow przed drapieznikami'},
  agronomy:{name:'Plodozmian',cost:{knowledge:24,gold:15},description:'+20% zbiorow i szybszy odrost pol'},
  logistics:{name:'Wozy transportowe',cost:{knowledge:30,tools:8},description:'+8 udzwigu i +10% predkosci'},
  masonry:{name:'Ciesielstwo',cost:{knowledge:24,tools:6},description:'+30% tempa budowy'},
 };
 export type Technology=keyof typeof technologies;
+export const prerequisites:Partial<Record<Technology,Technology[]>>={agronomy:['literacy'],logistics:['literacy'],masonry:['literacy'],irrigation:['agronomy'],preservation:['agronomy'],printing:['literacy'],solidarity:['printing','charter'],charter:['literacy'],husbandry:['literacy'],kennels:['husbandry']};
+export const branches:Record<string,Technology[]>={'Technologia':['literacy','masonry','logistics'],'Agrokultura':['agronomy','irrigation','preservation','husbandry','kennels'],'Idee i propaganda':['printing','charter','solidarity']};
 export const roadCost=(kind:RoadKind,length:number)=>kind==='dirt'?{wood:Math.ceil(length/35)}:{stone:Math.ceil(length/25),wood:Math.ceil(length/80)};

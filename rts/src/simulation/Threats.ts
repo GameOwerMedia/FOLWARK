@@ -72,7 +72,7 @@ export function tickThreats(w:World,dt:number){
  if(w.time>=t.deadline)finish(t.kind==='raid'?'Najezdzcy wycofali sie. Utraconych zapasow nie odzyskamy.':'Pozar wygasl. Spalone zapasy przepadly.');
 }
 export function validThreats(value:unknown):value is ThreatState{
- const s=value as ThreatState,n=(x:unknown)=>typeof x==='number'&&Number.isFinite(x)&&x>=0,p=(x:Point)=>x&&n(x.x)&&n(x.y)&&x.x<=3600&&x.y<=2400;
+ const s=value as ThreatState,n=(x:unknown)=>typeof x==='number'&&Number.isFinite(x)&&x>=0,p=(x:Point)=>x&&n(x.x)&&n(x.y)&&x.x<=5400&&x.y<=3600;
  if(!s||!n(s.nextAt)||!Number.isInteger(s.sequence)||s.sequence<0||!n(s.resolved)||!n(s.lostGrain))return false;
  const t=s.active;
  return t===null||!!t&&['fire','raid'].includes(t.kind)&&['warning','active'].includes(t.phase)&&p(t)&&Number.isInteger(t.buildingId)&&n(t.deadline)&&n(t.strength)&&t.strength<=1&&Array.isArray(t.raiders)&&t.raiders.length<=3&&t.raiders.every(e=>p(e)&&n(e.health)&&e.health<=60&&Array.isArray(e.path)&&e.path.length<=500&&e.path.every(p));

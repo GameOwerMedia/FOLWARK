@@ -5,9 +5,9 @@ import {issueEdict,insulate,setPress,sendConvoy,tickRegime,recordDeaths,fuelPerD
 import {neighborSites,gates,decorations} from '../src/simulation/Landscape';
 const advance=(w:World,seconds:number)=>{for(let t=0;t<seconds;t+=.1)w.tick(.1)};
 const dispatchTime=(w:World,seconds:number)=>{for(let t=0;t<seconds;t+=.1)tickRegime(w,.1)};
-test('farm fence is solid, gates are passable, and all neighbors are reachable',()=>{
+test('new farm has no free perimeter fence and all neighbors are reachable',()=>{
  const w=new World();
- assert.equal(w.navigation.clearPoint({x:900,y:180}),false);
+ assert.equal(w.navigation.clearPoint({x:900,y:180}),true);
  for(const g of gates)assert.ok(w.navigation.clearPoint(g));
  for(const n of neighborSites){
   const start={x:825,y:470},path=w.navigation.route(start,n.entry);assert.ok(path);

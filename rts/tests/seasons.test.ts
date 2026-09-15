@@ -22,15 +22,15 @@ test('season calendar and pending threats survive save/load; v6 gets a grace per
  const old={...w.snapshot(),version:6};delete (old as any).threats;
  other.restore(old);assert.equal(other.threats.active,null);assert.equal(other.threats.nextAt,w.time+150);
 });
-test('pasture fences block shortcuts but leave a route through the gate',()=>{
+test('pasture starts unfenced and residents can reach it',()=>{
  const w=new World(),b=w.buildings.find(b=>b.kind==='pasture')!,n=w.navigation;
- assert.equal(n.clearPoint({x:b.x-165,y:b.y-80}),false);
+ assert.equal(n.clearPoint({x:b.x-165,y:b.y-80}),true);
  assert.equal(n.clearPoint({x:b.x,y:b.y+8},12),true);
  const route=n.route({x:b.x+220,y:b.y-80},{x:b.x,y:b.y-70});
  assert.ok(route?.length);
  let previous={x:b.x+220,y:b.y-80};
  for(const p of route!){assert.ok(n.clearLine(previous,p,10));previous=p}
- assert.ok(route!.some(p=>p.y>b.y));
+ assert.ok(Math.hypot(previous.x-b.x,previous.y-(b.y-70))<2);
 });
 test('residents separate at rest instead of occupying one point',()=>{
  const w=new World('sandbox');idle(w);const [a,b]=w.units;a.x=b.x=2100;a.y=b.y=1100;
@@ -79,11 +79,11 @@ test('warm seasons do not burn fuel or cause cold injuries when heating is off',
  for(let i=0;i<600;i++)tickRegime(w,.1);
  assert.equal(w.units[0].health,health);assert.equal(w.resources.wood,wood);assert.ok(w.regime.heat>.8);
 });
-test('completing a pasture activates its fence collisions and keeps the gate open',()=>{
+test('completing a pasture does not grant a free fence',()=>{
  const w=new World('sandbox');idle(w);assert.ok(w.build('pasture',2250,1150));
  const b=w.buildings.at(-1)!;b.progress=.9999;
  const a=w.units.find(a=>a.species==='mule')!;a.target=b.id;a.job='build';a.task='build';a.path=[];a.x=b.x;a.y=b.y+40;
  w.tick(.1);assert.equal(b.progress,1);
- assert.equal(w.navigation.clearPoint({x:b.x-165,y:b.y-80}),false);
+ assert.equal(w.navigation.clearPoint({x:b.x-165,y:b.y-80}),true);
  assert.equal(w.navigation.clearPoint({x:b.x,y:b.y+8},12),true);
 });

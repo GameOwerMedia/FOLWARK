@@ -71,6 +71,22 @@ select{min-width:0;max-width:100%;background:#1b241b;color:#d8dec9;border:1px so
 .threat-panel p{font-size:11px;line-height:1.6;margin:8px 0}
 .threat-panel>strong{font-size:11px}
 
+/* Branches share a spine; costs and unavailable nodes stay visible. */
+.tech-branch{border-left:1px solid #9c884e;padding-left:14px;margin:10px 0 24px}
+.tech-node{position:relative;border-bottom:1px solid #ffffff18;padding:12px 0}
+.tech-node:before{content:"";position:absolute;left:-15px;top:23px;width:10px;border-top:1px solid #9c884e}
+.tech-node small{display:block;overflow-wrap:anywhere}
+.talent-node{display:flex;flex-direction:column;align-items:stretch;gap:5px;width:100%;min-height:60px;margin:7px 0;padding:9px 12px;text-align:left;border-radius:4px}
+.talent-node span{display:flex;align-items:center;gap:8px}
+.talent-node small{white-space:normal;line-height:1.5}
+.talent-node.child{width:calc(100% - 20px);margin-left:20px;border-left:2px solid #a39260}
+.foreign-farm{padding:18px 0;border-bottom:1px solid #ffffff25}
+.foreign-farm strong{display:block;margin:8px 0;font-size:13px}
+.foreign-farm label{display:block;margin:8px 0;font-size:12px}
+.foreign-farm meter{display:block;width:100%;height:10px}
+.foreign-heading{display:flex;align-items:center;gap:8px;text-align:left}
+.system-tree{padding-top:15px;border-top:1px solid #ffffff25}
+
 /* The generated title plate is full-bleed; commands remain real, localized controls. */
 #start-menu{background-image:var(--menu-keyart);background-size:cover;background-position:left center;background-color:#10191d}
 #start-menu .menu-vignette{background:#06100d30}

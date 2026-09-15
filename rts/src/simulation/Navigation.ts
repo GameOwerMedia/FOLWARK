@@ -10,7 +10,7 @@ export class Navigation {
  private travelCost(a:Point,b:Point){const distance=Math.hypot(b.x-a.x,b.y-a.y),steps=Math.max(1,Math.ceil(distance/15));let cost=0;for(let i=1;i<=steps;i++)cost+=distance/steps/this.speedAt({x:a.x+(b.x-a.x)*i/steps,y:a.y+(b.y-a.y)*i/steps});return cost}
  rebuild(buildings:Obstacle[],roads:Road[]=[]){
   this.roads=roads;
-  this.obstacles=[...buildings,...fenceObstacles,...neighborObstacles,...decorations.filter(d=>d.radius).map(d=>({x:d.x,y:d.y-8,rx:d.radius!,ry:d.radius!*.58}))];
+  this.obstacles=[...buildings,...neighborObstacles,...decorations.filter(d=>d.radius).map(d=>({x:d.x,y:d.y-8,rx:d.radius!,ry:d.radius!*.58}))];
   this.grid=Array.from({length:WORLD_HEIGHT/this.cell},(_,y)=>Array.from({length:WORLD_WIDTH/this.cell},(_,x)=>{
    const p={x:x*this.cell+10,y:y*this.cell+10};return this.clearPoint(p,12)?this.speedAt(p)>1.5?3:this.speedAt(p)>1?2:0:1;
   }));

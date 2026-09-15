@@ -1,3 +1,5 @@
+import {characterTree} from './StrategyPanel';
+import {isPolitical,canNegotiate} from '../simulation/ForeignPolitics';
 import {roles,aptitude,suited} from '../simulation/Roles';
 import {platforms,polls,preferredPlatform} from '../simulation/Society';
 import {treaties,envoyCost,onMission,treatyActive} from '../simulation/Diplomacy';
@@ -13,9 +15,9 @@ export function rolePanel(w:World,a:Resident,choice?:Job){
  (w.society.leaderId===a.id?'<div class="leader-badge">'+icon('crown')+' Przywodca folwarku</div>':'')+
  '<div class="detail-row"><span>Wydajnosc zadania</span><b>'+Math.round(aptitude(a,a.job,w.buildings.find(b=>b.id===a.target)?.kind)*(a.forced?.75:1)*100)+'%</b></div>'+
  (a.forced?'<p class="forced-warning">Przymus: wolniejsza praca, wieksze zmeczenie, krzywda i utrata zdrowia.</p>':'')+
- (mission?'<p class="envoy-status">'+({outbound:'Lot do sasiada',negotiating:'Negocjacje',return:'Powrot z poselstwa'})[mission.phase]+'</p>':a.species==='raven'?'<button class="wide-action" data-tab="neighbors">'+icon('send')+' Poselstwa i umowy</button>':
+ (mission?'<p class="envoy-status">'+({outbound:'Podroz do sasiada',negotiating:'Negocjacje',return:'Powrot z poselstwa'})[mission.phase]+'</p>':['raven','pig'].includes(a.species)?'<button class="wide-action" data-tab="neighbors">'+icon('send')+' Poselstwa i umowy</button>':
  '<button class="wide-action" data-natural="'+a.id+'">'+icon('sprout')+' Naturalny obowiazek</button>')+
- (!mission?'<label class="regime-select">Przydzial pracy<select id="role-job" aria-label="Przydzial pracy">'+jobs.map(j=>'<option value="'+j+'" '+((choice??a.job)===j?'selected':'')+'>'+taskNames[j]+' / '+Math.round(aptitude(a,j)*100)+'%'+(!suited(a,j)?' / przymus':'')+'</option>').join('')+'</select></label><button class="wide-action" data-role-assign="'+a.id+'">'+icon('clipboard-check')+' Przydziel zadanie</button>':'')+'</section>';
+ (!mission?'<label class="regime-select">Przydzial pracy<select id="role-job" aria-label="Przydzial pracy">'+jobs.map(j=>'<option value="'+j+'" '+((choice??a.job)===j?'selected':'')+'>'+taskNames[j]+' / '+Math.round(aptitude(a,j)*100)+'%'+(!suited(a,j)?' / przymus':'')+'</option>').join('')+'</select></label><button class="wide-action" data-role-assign="'+a.id+'">'+icon('clipboard-check')+' Przydziel zadanie</button>':'')+characterTree(w,a)+'</section>';
 }
 export function electionPanel(w:World){
  const s=w.society,leader=w.living.find(a=>a.id===s.leaderId),votes=polls(w);
@@ -23,13 +25,14 @@ export function electionPanel(w:World){
  (s.lastWinner?'<p>Ostatni wynik: '+esc(w.units.find(a=>a.id===s.lastWinner)?.name??'')+' / '+s.votes[s.lastWinner]+' glosow</p>':'')+
  '<h3>Kandydaci i sondaz</h3><div class="candidates">'+w.living.map(a=>'<article class="candidate"><button data-unit="'+a.id+'" class="candidate-name"><span class="atlas" style="'+atlasStyle('portrait-'+a.species)+'"></span><strong>'+esc(a.name)+'</strong><b>'+votes[a.id]+'</b></button><label>Program<select data-platform="'+a.id+'" aria-label="Program: '+esc(a.name)+'">'+Object.entries(platforms).map(([k,p])=>'<option value="'+k+'" '+((s.nominations[a.id]??preferredPlatform(a))===k?'selected':'')+'>'+p.name+'</option>').join('')+'</select></label><button data-campaign="'+a.id+'" '+((s.campaigns[a.id]??0)>=3||!w.canPay({gold:10})?'disabled':'')+' title="10 monet. Wieksze poparcie, do trzech spotkan.">'+icon('megaphone')+' Kampania '+(s.campaigns[a.id]??0)+'/3</button></article>').join('')+'</div></section>';
 }
-export function embassyPanel(w:World){
- const envoys=w.living.filter(a=>a.species==='raven'&&!onMission(w,a.id));
+export function embassyPanel(w:World,selectedEnvoy=''){
+ const envoys=w.living.filter(a=>['pig','raven'].includes(a.species)&&!onMission(w,a.id));
+ const chosen=envoys.find(a=>a.id===selectedEnvoy)??envoys[0];
  return '<section class="embassy-panel"><h3>Poselstwa i umowy</h3>'+
- (!envoys.length?'<p>Brak wolnego kruka. Przyjmij posla albo poczekaj na powrot.</p>':'<label class="regime-select">Posel<select id="envoy-unit" aria-label="Posel">'+envoys.map(a=>'<option value="'+a.id+'">'+esc(a.name)+'</option>').join('')+'</select></label>')+
+ (!envoys.length?'<p>Brak wolnego posla. Poczekaj na powrot swini lub kruka.</p>':'<label class="regime-select">Posel<select id="envoy-unit" aria-label="Posel">'+envoys.map(a=>'<option value="'+a.id+'">'+esc(a.name)+'</option>').join('')+'</select></label>')+
  neighborSites.map(n=>{
  const mission=w.diplomacy.missions.find(m=>m.neighbor===n.id);
- return '<article class="embassy"><h4>'+n.name+'</h4>'+(mission?'<p>'+esc(w.units.find(a=>a.id===mission.unitId)?.name??'')+' / '+({outbound:'Lot do sasiada',negotiating:'Negocjacje',return:'Powrot z poselstwa'})[mission.phase]+'</p>':
- Object.entries(treaties).map(([k,t])=>{const active=treatyActive(w,n.id,k as keyof typeof treaties),remaining=w.diplomacy.agreements.find(a=>a.neighbor===n.id&&a.kind===k);return '<button class="treaty-action" data-envoy="'+n.id+'" data-treaty="'+k+'" '+(active||!envoys.length||!w.canPay({gold:envoyCost(w,k as keyof typeof treaties)})?'disabled':'')+'><span>'+icon(active?'file-check':'send')+' '+t.name+'</span><small>'+t.description+'</small><b>'+(active?'Aktywna / '+Math.ceil((remaining!.until-w.time)/65*24)+' godz.':envoyCost(w,k as keyof typeof treaties)+' monet')+'</b></button>'}).join(''))+'</article>';
+ return '<article class="embassy"><h4>'+n.name+'</h4>'+(mission?'<p>'+esc(w.units.find(a=>a.id===mission.unitId)?.name??'')+' / '+({outbound:'Podroz do sasiada',negotiating:'Negocjacje',return:'Powrot z poselstwa'})[mission.phase]+'</p>':
+ Object.entries(treaties).map(([k,t])=>{const active=treatyActive(w,n.id,k as keyof typeof treaties),remaining=w.diplomacy.agreements.find(a=>a.neighbor===n.id&&a.kind===k);return '<button class="treaty-action" data-envoy="'+n.id+'" data-treaty="'+k+'" '+(active||!envoys.length||isPolitical(k)&&(chosen?.species!=='pig'||!canNegotiate(w,n.id,k))||!w.canPay({gold:envoyCost(w,k as keyof typeof treaties)})?'disabled':'')+'><span>'+icon(active?'file-check':'send')+' '+t.name+'</span><small>'+t.description+'</small><b>'+(active?'Aktywna / '+Math.ceil((remaining!.until-w.time)/65*24)+' godz.':envoyCost(w,k as keyof typeof treaties)+' monet')+'</b></button>'}).join(''))+'</article>';
  }).join('')+'</section>';
 }

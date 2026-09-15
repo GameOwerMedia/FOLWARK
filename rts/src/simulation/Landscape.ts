@@ -1,16 +1,16 @@
-export const WORLD_WIDTH=3600, WORLD_HEIGHT=2400;
+export const WORLD_WIDTH=5400, WORLD_HEIGHT=3600;
 export type Decoration={key:string;x:number;y:number;width:number;radius?:number};
 export const pond={x:340,y:960,rx:215,ry:130};
 export const roads:number[][][]=[
- [[700,1260],[700,1020],[770,830],[805,640],[870,510],[1145,555],[1450,670],[1650,650],[1950,650],[2200,610],[2780,610],[2810,840],[3030,800]],
+ [[700,1260],[700,1020],[770,830],[805,640],[870,510],[1145,555],[1450,670],[1650,650],[1950,650],[2200,610],[2780,610],[2810,840],[3800,840],[4630,800]],
  [[350,450],[555,605],[805,640],[825,420]],
  [[805,640],[1000,790],[1050,1005]],
  [[1145,555],[1230,725],[1250,895]],
- [[700,1260],[850,1430],[1100,1550],[870,1730],[870,2050],[1100,2080]],
- [[1100,1550],[1800,1550],[2350,1740],[2580,2080],[2750,2080]],
+ [[700,1260],[850,1430],[1100,1550],[870,1730],[870,2050],[870,3180],[1100,3180]],
+ [[1100,1550],[1800,1550],[2350,1740],[2580,2080],[3400,2700],[4350,3180]],
  [[2350,1740],[2400,1490]],
  [[2580,2080],[3010,1800]],
- [[2810,840],[3270,1050],[3400,1400],[3800,1400]],
+ [[2810,840],[3270,1050],[3400,1400],[5500,1400]],
 ];
 export const decorations:Decoration[]=[];
 let seed=192;const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};
@@ -51,17 +51,17 @@ export const fenceSegments:number[][][]=[
 ];
 export const gates=[{x:700,y:1150,name:'Brama poludniowa'},{x:1650,y:650,name:'Brama wschodnia'}];
 export const neighborSites=[
- {id:'dwor',name:'Kamienny Dwor',x:3110,y:635,entry:{x:3030,y:800},art:'house',description:'Ludzie. Kupia plony. Kupia tez cudza prace.'},
- {id:'mlyn',name:'Wolny Mlyn',x:1120,y:1920,entry:{x:1100,y:2080},art:'mill',description:'Spoldzielnia. Wymienia plony i opal. Nie ufa represjom.'},
- {id:'czerwony',name:'Czerwony Folwark',x:2830,y:1920,entry:{x:2750,y:2080},art:'barn',description:'Rzadza swinie. Zloto otwiera ich spichlerze.'},
+ {id:'dwor',name:'Kamienny Dwor',x:4710,y:635,entry:{x:4630,y:800},art:'house',description:'Ludzie. Kupia plony. Kupia tez cudza prace.'},
+ {id:'mlyn',name:'Wolny Mlyn',x:1120,y:3020,entry:{x:1100,y:3180},art:'mill',description:'Spoldzielnia. Wymienia plony i opal. Nie ufa represjom.'},
+ {id:'czerwony',name:'Czerwony Folwark',x:4430,y:3020,entry:{x:4350,y:3180},art:'barn',description:'Rzadza swinie. Zloto otwiera ich spichlerze.'},
 ] as const;
 export const fenceObstacles=fenceSegments.flatMap(([a,b])=>{
  const count=Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/20);
  return Array.from({length:count+1},(_,i)=>({x:a[0]+(b[0]-a[0])*i/count,y:a[1]+(b[1]-a[1])*i/count,rx:12,ry:12}));
 });
-export const cityGate={id:'city',name:'Miasto / trakt kupiecki',x:3540,y:1400,entry:{x:3540,y:1400}};
+export const cityGate={id:'city',name:'Miasto / trakt kupiecki',x:5340,y:1400,entry:{x:5340,y:1400}};
 export const tradeSites=[...neighborSites,cityGate];
-export const neighborObstacles=neighborSites.flatMap(n=>[{x:n.x,y:n.y-25,rx:90,ry:38},{x:n.x-150,y:n.y+45,rx:65,ry:30}]);
+export const neighborObstacles=neighborSites.flatMap(n=>[{x:n.x,y:n.y-25,rx:90,ry:38},{x:n.x-190,y:n.y+20,rx:110,ry:55}]);
 export const regions=[{name:'Stary folwark',x:850,y:650},{name:'Wschodnie laki',x:2470,y:680},{name:'Kamienny grzbiet',x:2860,y:1650},{name:'Poludniowy sad',x:1120,y:1820}];
 for(let i=0;i<95;i++){
  const x=100+random()*(WORLD_WIDTH-200),y=200+random()*(WORLD_HEIGHT-280);

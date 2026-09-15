@@ -164,7 +164,7 @@ export function sendConvoy(w:World,id:string,kind:'trade'|'aid'|'contract',unitI
 }
 export function validRegime(raw:unknown):raw is RegimeState{
  const r=raw as RegimeState,finite=(n:unknown)=>typeof n==='number'&&Number.isFinite(n),unit=(n:unknown)=>finite(n)&&(n as number)>=0&&(n as number)<=1;
- const point=(p:Point)=>p&&finite(p.x)&&finite(p.y)&&p.x>=0&&p.x<=3600&&p.y>=0&&p.y<=2400;
+ const point=(p:Point)=>p&&finite(p.x)&&finite(p.y)&&p.x>=0&&p.x<=5400&&p.y>=0&&p.y<=3600;
  if(!r||![r.trust,r.integrity,r.heat].every(unit)||!['off','normal','high'].includes(r.heating)||!['free','censored'].includes(r.press)||typeof r.insulated!=='boolean'||![r.lies,r.nextEdict,r.forcedUntil,r.revealDay].every(n=>finite(n)&&n>=0))return false;
  if(!r.relations||neighborSites.some(n=>!unit(r.relations[n.id]))||!Array.isArray(r.convoys)||r.convoys.length>4||!Array.isArray(r.official)||r.official.some(e=>!e||!finite(e.day)||typeof e.text!=='string'))return false;
  if(![r.deaths,r.sold].every(a=>Array.isArray(a)&&a.every(id=>typeof id==='string')&&new Set(a).size===a.length))return false;

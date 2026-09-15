@@ -56,14 +56,14 @@ test('an embassy negotiates and returns before ratification; paused time and bus
  assert.equal(sendEnvoy(w,a.id,'mlyn','trade'),false);assert.ok(onMission(w,a.id));assert.equal(treatyActive(w,'dwor','knowledge'),false);
  w.assign([a.id],'harvest',undefined,true);w.move([a.id],50,50);w.order([a.id],'resting');assert.equal(a.task,'diplomacy');
  const before=w.snapshot();w.paused=true;advance(w,10);assert.deepEqual(w.snapshot(),before);w.paused=false;
- advance(w,13);assert.equal(w.diplomacy.missions[0].phase,'negotiating');assert.equal(w.resources.knowledge,knowledge);
+ advance(w,22);assert.equal(w.diplomacy.missions[0].phase,'negotiating');assert.equal(w.resources.knowledge,knowledge);
  const copy=new World();copy.restore(w.snapshot());assert.deepEqual(copy.snapshot(),w.snapshot());
- advance(w,35);assert.equal(w.diplomacy.missions.length,0);assert.ok(treatyActive(w,'dwor','knowledge'));assert.equal(w.resources.knowledge,knowledge+20);
+ advance(w,40);assert.equal(w.diplomacy.missions.length,0);assert.ok(treatyActive(w,'dwor','knowledge'));assert.equal(w.resources.knowledge,knowledge+20);
  assert.equal(sendEnvoy(w,a.id,'dwor','knowledge'),false);
 });
 test('embargo can reject a treaty and a dead envoy cannot ratify it',()=>{
  const w=quiet(),a=w.units.find(a=>a.species==='raven')!;w.regime.relations.dwor=.1;
- assert.ok(sendEnvoy(w,a.id,'dwor','trade'));advance(w,50);assert.equal(w.diplomacy.agreements.length,0);
+ assert.ok(sendEnvoy(w,a.id,'dwor','trade'));advance(w,60);assert.equal(w.diplomacy.agreements.length,0);
  assert.ok(sendEnvoy(w,a.id,'mlyn','trade'));a.health=0;tickDiplomacy(w,.1);assert.equal(w.diplomacy.missions.length,0);assert.equal(w.diplomacy.agreements.length,0);
 });
 test('trade and peace treaties have timed, measurable effects',()=>{
@@ -95,7 +95,7 @@ test('v5 saves migrate without deleting residents, cargo or their existing histo
  s.units[5].job='stone';s.units[5].load=2;s.units[5].resource='stone';
  for(const a of s.units){delete a.forced;delete a.dutyProgress}
  const other=new World();other.restore(s);
- assert.equal(other.units.length,s.units.length);assert.equal(other.units[5].job,null);assert.equal(other.units[5].load,2);assert.deepEqual(other.journal,s.journal);assert.equal(other.resources.milk,0);assert.equal(other.snapshot().version,7);
+ assert.equal(other.units.length,s.units.length);assert.equal(other.units[5].job,null);assert.equal(other.units[5].load,2);assert.deepEqual(other.journal,s.journal);assert.equal(other.resources.milk,0);assert.equal(other.snapshot().version,8);
 });
 test('malformed society, flight and specialisation saves are rejected atomically',()=>{
  const w=quiet(),before=w.snapshot();
