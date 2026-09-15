@@ -1,7 +1,7 @@
 import prepared from './prepared-atlas.json';
 export type Frame = { sheet: string; rect: [number, number, number, number]; sheetSize?:[number,number] };
 export function assetUrl(sheet:string):string {
-  return (window as unknown as {FOLWARK_ASSETS?:Record<string,string>}).FOLWARK_ASSETS?.[sheet] ?? './assets/'+sheet+'.png';
+  return (window as unknown as {FOLWARK_ASSETS?:Record<string,string>}).FOLWARK_ASSETS?.[sheet] ?? new URL('./assets/'+sheet+'.png',document.baseURI).href;
 }
 export const sheets = ['concept-original','ui-original','resources','animals-original','buildings-original','animals-work','cards-original','buildings-civic','ui-heraldry','animals-special','cards-special','buildings-village','ui-portraits','concept-farm','animals-final','buildings-final','ui-final','cards-final'];
 const f = (sheet: string, ...rect: [number, number, number, number]): Frame => ({ sheet, rect });
