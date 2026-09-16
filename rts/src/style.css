@@ -87,6 +87,11 @@ select{min-width:0;max-width:100%;background:#1b241b;color:#d8dec9;border:1px so
 .foreign-heading{display:flex;align-items:center;gap:8px;text-align:left}
 .system-tree{padding-top:15px;border-top:1px solid #ffffff25}
 
+/* Keep the native controls above the silent cover movie. */
+.menu-cover-video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;object-position:left center;pointer-events:none;opacity:0}
+.menu-cover-video.is-playing{opacity:1}
+@media(prefers-reduced-motion:reduce),(max-aspect-ratio:13/10){.menu-cover-video{display:none}}
+
 /* The generated title plate is full-bleed; commands remain real, localized controls. */
 #start-menu{background-image:var(--menu-keyart);background-size:cover;background-position:left center;background-color:#10191d}
 #start-menu .menu-vignette{background:#06100d30}

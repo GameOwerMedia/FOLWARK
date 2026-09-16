@@ -1,4 +1,5 @@
 import {localizeDOM,locale} from '../i18n';
+import {createMenuCover} from './MenuCover';
 import {assetUrl} from './Atlas';
 import {World} from '../simulation/World';
 import type {FarmScene} from './FarmScene';
@@ -9,11 +10,12 @@ export function attachStartMenu(scene:FarmScene,replace:(w:World)=>void,apply:(p
  const root=document.createElement('section');root.id='start-menu';root.style.setProperty('--menu-keyart-portrait','url("'+assetUrl('menu-keyart-portrait')+'")');root.style.setProperty('--menu-keyart','url("'+assetUrl('menu-keyart')+'")');root.setAttribute('aria-label','Menu gry');root.setAttribute('role','dialog');root.setAttribute('aria-modal','true');document.body.append(root);
  let screen:Screen='main',active=false,started=false,priorPause=false,message='',pending:(()=>void)|null=null,confirmText='';
  let preferences=readPreferences();apply(preferences);
+ const cover=createMenuCover(root,new URL('./assets/menu-cover-loop.mp4',document.baseURI).href,()=>active&&screen==='main'&&!preferences.reducedMotion);
  const i=(name:string)=>'<i data-lucide="'+name+'"></i>';
  const button=(id:string,label:string,icon:string,disabled=false)=>'<button data-menu="'+id+'" '+(disabled?'disabled':'')+'>'+i(icon)+'<span>'+label+'</span></button>';
  const capture=(enabled:boolean)=>{if(scene.input?.keyboard){scene.input.keyboard.enabled=enabled;if(enabled)scene.input.keyboard.enableGlobalCapture();else scene.input.keyboard.disableGlobalCapture()}};
  const resize=()=>requestAnimationFrame(()=>{if(scene.scale){const bounds=document.getElementById('game')!.getBoundingClientRect();scene.scale.setParentSize(bounds.width,bounds.height);scene.center()}});
- function close(){capture(true);active=false;root.hidden=true;scene.menuOpen=false;document.body.classList.remove('menu-open');scene.world.paused=priorPause;resize();scene.onChange()}
+ function close(){capture(true);active=false;cover.sync();root.hidden=true;scene.menuOpen=false;document.body.classList.remove('menu-open');scene.world.paused=priorPause;resize();scene.onChange()}
  function show(next:Screen='main'){
   if(!active){priorPause=scene.world.paused;active=true;scene.world.paused=true}
   capture(false);screen=next;message='';root.hidden=false;scene.menuOpen=true;document.body.classList.add('menu-open');scene.cancelMode();render();resize();
@@ -43,6 +45,7 @@ export function attachStartMenu(scene:FarmScene,replace:(w:World)=>void,apply:(p
    if(screen==='confirm')body+='<p class="menu-confirm-text">'+escapeHtml(confirmText)+'</p><div class="menu-file-actions">'+button('cancel','Anuluj','x')+button('confirm','Potwierdz','check')+'</div>';
   }
   root.innerHTML='<div class="menu-vignette"></div><div class="menu-content '+(screen==='main'?'menu-home':'menu-subpage')+'">'+body+'<p class="menu-message" role="status">'+escapeHtml(message)+'</p></div>';
+  cover.sync();
   localizeDOM(root);
   createIcons({icons,attrs:{'stroke-width':1.6}});
  }
@@ -79,7 +82,7 @@ export function attachStartMenu(scene:FarmScene,replace:(w:World)=>void,apply:(p
    }
    const key=target.dataset.pref as keyof Preferences;if(!key)return;
    const value=key==='language'?(target.value==='pl'?'pl':'en'):target.type==='checkbox'?target.checked:Number(target.value);
-   preferences={...preferences,[key]:value};writePreferences(preferences);apply(preferences);localizeDOM(root);
+   preferences={...preferences,[key]:value};writePreferences(preferences);apply(preferences);cover.sync();localizeDOM(root);
    if(key==='language'){render();root.querySelector<HTMLElement>('[data-pref="language"]')?.focus()}
   }catch(error){message=error instanceof Error?error.message:'Nie mozna odczytac pliku.';render()}
  });
@@ -94,5 +97,5 @@ export function attachStartMenu(scene:FarmScene,replace:(w:World)=>void,apply:(p
   }
  });
  show();
- return {show,close,ready:()=>{capture(!active);resize();render()},get active(){return active},get started(){return started}};
+ return {show,close,ready:()=>{scene.events.once('shutdown',()=>cover.destroy());capture(!active);resize();render()},get active(){return active},get started(){return started}};
 }
