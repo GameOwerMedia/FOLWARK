@@ -22,7 +22,7 @@
 
 Most strategy games model a society as a few global numbers. FOLWARK models it as a herd of individuals, so the slide from revolution into hierarchy happens animal by animal:
 
-- **Every animal is someone.** Each one has health, hunger, loyalty, fear, grievance, strength, courage, charisma, wit and ambition, plus perks rolled at birth (Born Leader, Silver Tongue, Iron Back, Coward, Glutton and others). Leaders, schemers and scapegoats come out of that, not out of a script.
+- **Every animal is someone.** Each one has health, hunger, thirst, loyalty, fear, grievance, strength, courage, charisma, wit and ambition, plus perks rolled at birth (Born Leader, Silver Tongue, Iron Back, Coward, Glutton and others). Leaders, schemers and scapegoats come out of that, not out of a script.
 - **The food is real.** Grain, grass, meat and water regenerate by season and are eaten by species-specific diets. Overgraze the meadow and the hay comes out of the granary; drain the waterhole in summer and thirst spreads.
 - **The species do not overlap.** Pigs scheme and form councils, dogs are force that cannot govern, horses are the great workers, hens are dim but multiply fast. Eight species, each with its own stat ranges, diet, breeding rate and a lifespan scaled from the real animal.
 - **Power has levers.** Propaganda, repression, privilege and free elections are sliders; the constitution decides which species may rule (pigs, dogs or any animal) and amending it costs weeks of turmoil. The regime is named live from what you set: one-party rule, competitive autocracy, personalist cult, military rule of the dogs and others.

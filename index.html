@@ -166,6 +166,7 @@
   .tip .bar.warn i { background: var(--red-hi); }
   #powerStats { display: flex; flex-direction: column; gap: 4px; }
   #powerStats .pw { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 10px; color: var(--bone-dim); margin: 0; }
+  #powerStats .pw > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #powerStats .pw .track { flex: 1; height: 6px; background: rgba(233,227,211,0.1); }
   #powerStats .pw .track i { display: block; height: 100%; }
   #powerStats .pw b { font-weight: 400; color: var(--bone); }
@@ -696,6 +697,24 @@ const sexSym = (a) => a.sex === 'f' ? '&#9792;' : '&#9794;';
 function dailyNeedTotal() { return alive().reduce((s, a) => s + SPECIES[a.species].need, 0); }
 const bufferDays = () => foodStock / Math.max(1, dailyNeedTotal());
 const dogsAlive = () => alive().filter(a => a.species === 'dog');
+function payFood(weeks) { foodStock = Math.max(0, foodStock - dailyNeedTotal() * weeks); }
+
+// the waterhole is a weekly stock, like the meadow: speed and pause must not change who is thirsty
+function waterDrink(season) {
+  const pop = alive();
+  if (!pop.length) return;
+  // summer heat drinks the hole dry; the other seasons refill it unless the herd is huge
+  const per = season === 1 ? 1.2 : 0.38;
+  let demand = 0;
+  for (const a of pop) demand += per * a.metab;
+  const take = Math.min(demand, Math.max(0, waterStock));
+  waterStock -= take;
+  const sat = demand > 0 ? take / demand : 1;
+  for (const a of pop) {
+    if (sat > 0.98) a.thirst = clamp(a.thirst - 0.3, 0, 1);
+    else a.thirst = clamp(a.thirst + (1 - sat) * (season === 1 ? 0.32 : 0.16) * a.metab, 0, 1);
+  }
+}
 
 function economyStep() {
   const s = seasonOf(day);
@@ -726,52 +745,62 @@ function economyStep() {
   // the meadow regrows with the season; the sky refills the waterhole
   grassStock = Math.min(GRASS_CAP, grassStock + [30, 20, 14, 3][s]);
   waterStock = Math.min(WATER_CAP, waterStock + [24, 8, 18, 16][s] + (built.well ? 9 : 0));
+  waterDrink(s);
 
   const totalNeed = dailyNeedTotal();
-  foodStock = Math.min(foodStock, totalNeed * (built.granary ? 70 : 40));
-  const targetRation = clamp(foodStock / (totalNeed * 12), 0.45, 1.25);
+  if (totalNeed > 0) foodStock = Math.min(foodStock, totalNeed * (built.granary ? 70 : 40));
+  const targetRation = totalNeed > 0 ? clamp(foodStock / (totalNeed * 12), 0.45, 1.25) : 1;
   famine = bufferDays() < 3;
   const ineq = famine ? R.inequality * 0.35 : R.inequality;
   const waste = built.bakery ? 0.92 : 1;
   let consumed = 0, dogFillSum = 0;
-  for (const a of alive()) {
+  // privilege is a claim on the stores: the favored eat before the commons run out
+  const diners = alive().slice().sort((a, b) => privileged(b) - privileged(a));
+  for (const a of diners) {
     const sp = SPECIES[a.species];
     let fill;
     if (a.species === 'dog') {
       // dogs eat meat, not hay
       const want = sp.meat;
-      const got = Math.min(want, meatStock);
+      const got = Math.min(want, Math.max(0, meatStock));
       meatStock -= got;
       fill = got / sp.meat;
       dogFillSum += fill;
       if (fill < 0.5) a.loyalty = clamp(a.loyalty - 0.012, 0, 1);
     } else if (sp.grazer) {
-      // grazers live off the meadow first; the shortfall comes out of the hay (grain) at a markup
-      const cls = privileged(a) ? (1 + ineq * 1.6) : (1 - ineq * 0.65);
-      const want = sp.need * targetRation * cls;
-      const grass = Math.min(want, grassStock);
+      // the meadow is common: a green field feeds a grazer even when the granary is rationed.
+      // privilege and the hay rick apply only to the hay that covers a shortfall.
+      const want = sp.need;
+      const grass = Math.min(want, Math.max(0, grassStock));
       grassStock -= grass;
-      const hay = Math.min((want - grass) * 1.3, foodStock);
-      foodStock -= hay; consumed += hay;
-      fill = (grass + hay / 1.3) / sp.need;
+      const short = want - grass;
+      const hayRate = 1.3 * (built.bakery ? 0.92 : 1);
+      let hay = 0;
+      if (short > 0) {
+        const cls = privileged(a) ? (1 + ineq * 1.6) : Math.max(0.35, 1 - ineq * 0.65);
+        hay = Math.min(short * hayRate * cls, Math.max(0, foodStock));
+        foodStock -= hay;
+        consumed += hay;
+      }
+      fill = (grass + hay / hayRate) / sp.need;
     } else {
       const cls = privileged(a) ? (1 + ineq * 1.6)
                 : a.role === 'enforcer' ? (1 + ineq * 0.6)
                 : (1 - ineq * 0.65);
       const want = sp.need * targetRation * cls * waste;
-      let got = Math.min(want, foodStock);
+      let got = Math.min(want, Math.max(0, foodStock));
       foodStock -= got; consumed += got;
       if (a.species === 'pig' && got < want) {
         // pigs are omnivores — when grain runs short, they take a little from the dogs' larder
-        const m2 = Math.min((want - got) * 0.45, meatStock);
+        const m2 = Math.min((want - got) * 0.45, Math.max(0, meatStock));
         meatStock -= m2;
         got += m2;
       }
       fill = got / (sp.need * waste);
     }
     a.hunger = clamp(a.hunger + (0.82 - fill) * 0.2 * a.metab + (day < driveUntil && sp.works ? 0.02 : 0), 0, 1);
-    a.thirst = clamp(a.thirst + (seasonOf(day) === 1 ? 0.2 : 0.15) * a.metab, 0, 1);
-    a.health = clamp(a.health + (0.48 - a.hunger) * ((built.infirmary ? 0.075 : 0.05) + (built.well ? 0.008 : 0)) - (a.thirst > 0.9 ? 0.02 : 0) - Math.max(0, a.age - a.lifespan) * 0.0002, 0, 1);
+    const thirstHurt = a.thirst * a.thirst * 0.05;
+    a.health = clamp(a.health + (0.48 - a.hunger) * ((built.infirmary ? 0.075 : 0.05) + (built.well ? 0.008 : 0)) - thirstHurt - Math.max(0, a.age - a.lifespan) * 0.0002, 0, 1);
   }
   // the pack hunts rats, rabbits and scraps — a small pack feeds itself, a large one cannot
   const dogsN2 = dogsAlive().length;
@@ -797,6 +826,10 @@ function economyStep() {
         'You let the meat run out.<br><b>' + prey.name + '</b> (' + SPECIES[prey.species].label + ') is gone. The pack fed itself &mdash; and learned it can.<br><span class="rd">Feed them, or choose who feeds them. Those are the only options.</span>');
     }
   }
+  foodStock = Math.max(0, foodStock);
+  meatStock = Math.max(0, meatStock);
+  grassStock = Math.max(0, grassStock);
+  waterStock = Math.max(0, waterStock);
   lastProd = prod; lastProduce = produce; lastCons = consumed;
   realPC = totalNeed > 0 ? clamp((prod + produce) / totalNeed, 0, 2) : 0;
 
@@ -878,8 +911,13 @@ function runElection(snap) {
   const L = leaderOf(); if (!L) return;
   lastElection = day;
   const voters = adults();
-  const rival = alive().filter(a => a !== L && eligible(a) && a.voice > 0.35 && a.role !== 'enforcer')
+  let rival = alive().filter(a => a !== L && eligible(a) && a.voice > 0.35 && a.role !== 'enforcer')
     .sort((a, b) => b.voice - a.voice)[0] || null;
+  // every dog is an enforcer, so a dogs-only ballot would otherwise have one name on it
+  if (!rival && CONST.rulers === 'dogs') {
+    rival = alive().filter(a => a !== L && a.species === 'dog')
+      .sort((a, b) => b.ambition - a.ambition)[0] || null;
+  }
   banner(snap ? 'SNAP ELECTION' : 'ELECTION DAY', rival ? (L.name + ' vs ' + rival.name) : 'one name on the ballot', C.bone);
   if (!rival) {
     journal('election &rarr; no eligible opposing candidate');
@@ -1165,7 +1203,7 @@ function canPlaceAt(x, y, w) {
 function placeBuild(x, y) {
   const b = BUILDS.find(z => z.id === placement.id);
   if (!b || !canPlaceAt(x, y, b.w)) return;
-  foodStock -= dailyNeedTotal() * b.cost;
+  payFood(b.cost);
   construction = { id: b.id, doneAt: day + b.weeks, weeks: b.weeks, x, y, w: b.w };
   placement = null;
   groundKey = '';
@@ -1211,25 +1249,25 @@ function tradeStink() {
 const MARKET = [
   { id: 'meat', label: 'Buy meat', cost: '&minus;3 wks grain &rarr; +30 meat', cd: 8,
     can: () => bufferDays() >= 6,
-    fn() { foodStock -= dailyNeedTotal() * 3; meatStock += 30; journal('<span class="x">the gate</span> &rarr; grain out, a cart of meat in &middot; the dogs eat'); } },
+    fn() { payFood(3); meatStock += 30; journal('<span class="x">the gate</span> &rarr; grain out, a cart of meat in &middot; the dogs eat'); } },
   { id: 'hens', label: 'Buy 2 hens', cost: '&minus;1.5 wks grain', cd: 10,
     can: () => bufferDays() >= 5 && alive().length < POP_CAP - 1,
-    fn() { foodStock -= dailyNeedTotal() * 1.5; arriveAnimal('hen'); arriveAnimal('hen'); } },
+    fn() { payFood(1.5); arriveAnimal('hen'); arriveAnimal('hen'); } },
   { id: 'sheep', label: 'Buy a sheep', cost: '&minus;2 wks grain', cd: 10,
     can: () => bufferDays() >= 5 && alive().length < POP_CAP,
-    fn() { foodStock -= dailyNeedTotal() * 2; arriveAnimal('sheep'); } },
+    fn() { payFood(2); arriveAnimal('sheep'); } },
   { id: 'cow', label: 'Buy a cow', cost: '&minus;4 wks grain', cd: 14,
     can: () => bufferDays() >= 7 && alive().length < POP_CAP,
-    fn() { foodStock -= dailyNeedTotal() * 4; arriveAnimal('cow'); } },
+    fn() { payFood(4); arriveAnimal('cow'); } },
   { id: 'horse', label: 'Buy a horse', cost: '&minus;6 wks grain', cd: 16,
     can: () => bufferDays() >= 9 && alive().length < POP_CAP,
-    fn() { foodStock -= dailyNeedTotal() * 6; arriveAnimal('horse'); } },
+    fn() { payFood(6); arriveAnimal('horse'); } },
   { id: 'pig', label: 'Buy a pig', cost: '&minus;5 wks grain &middot; grows the council', cd: 18,
     can: () => bufferDays() >= 8 && alive().length < POP_CAP,
-    fn() { foodStock -= dailyNeedTotal() * 5; const p = arriveAnimal('pig', 'a pig arrives at the gate &middot; another mouth at the table'); if (p) journal('<span class="n">the pig council grows &mdash; and so does the appetite for power</span>'); } },
+    fn() { payFood(5); const p = arriveAnimal('pig', 'a pig arrives at the gate &middot; another mouth at the table'); if (p) journal('<span class="n">the pig council grows &mdash; and so does the appetite for power</span>'); } },
   { id: 'dog', label: 'Buy a dog', cost: '&minus;2 wks grain &minus;8 meat', cd: 14,
     can: () => bufferDays() >= 5 && meatStock >= 8 && alive().length < POP_CAP,
-    fn() { foodStock -= dailyNeedTotal() * 2; meatStock -= 8; const d = arriveAnimal('dog'); if (d) d.role = 'enforcer'; } }
+    fn() { payFood(2); meatStock = Math.max(0, meatStock - 8); const d = arriveAnimal('dog'); if (d) d.role = 'enforcer'; } }
 ];
 function castTrade(id) {
   const m = MARKET.find(x => x.id === id);
@@ -1361,16 +1399,15 @@ function lifeStep() {
     }
   }
   succession();
-  // births — a female needs an adult male of her kind on the farm; dogs need the kennel
+  // births — a female needs an adult male of her kind; the kennel makes dogs likelier.
+  // the roll is per week, not per pixel: sprites walk slower than the calendar, and a mare
+  // who never reaches the barn in an evening would otherwise never foal.
   if (alive().length < POP_CAP && bufferDays() > 4) {
     for (const m of adults()) {
       const sp = SPECIES[m.species];
       if (!sp.repro || m.sex !== 'f' || m.role === 'leader' || m.gestCd > 0 || m.hunger > 0.7) continue;
       if (!hasMale(m.species)) continue;
-      // breeding happens in its place — the female must actually be home
-      const home = homeSpot(m.species);
-      if (!home || Math.hypot(m.x - home.x, m.y - home.y) > 95) continue;
-      let p = sp.repro * 2.2; // the home requirement gates it; the roll compensates
+      let p = sp.repro;
       if (m.species === 'hen') p *= built.henhouse ? 1.5 : 0.6;
       if (m.species === 'dog' && built.kennel) p *= 1.5;
       if (Math.random() < p) {
@@ -1438,7 +1475,8 @@ function resetRun() {
 
 function dailyStep() {
   day++;
-  if (alive().length < 4) { resetRun(); return; }
+  // dogs alone do not keep a farm: the pack feeds itself and the week never ends
+  if (alive().length < 4 || !alive().some(a => a.species !== 'dog')) { resetRun(); return; }
   economyStep();
   mindsStep();
   announceStep();
@@ -1568,8 +1606,13 @@ function banner(title, sub, color) { bannerState = { title, sub, start: performa
 // ============================== EVENT POPUPS (pause the world) ==============================
 const popupQueue = [];
 let popupOpen = false, pausedBeforePopup = false;
+function portraitSrc(a) {
+  if (typeof PORTRAITS === 'undefined' || !a) return null;
+  return PORTRAITS[String(a.name || '').toLowerCase()] || PORTRAITS[a.species]
+    || PORTRAITS[{ horse: 'boxer', donkey: 'benjamin' }[a.species]] || null;
+}
 function portraitImg(a) {
-  const src = typeof PORTRAITS !== 'undefined' ? (PORTRAITS[a.name.toLowerCase()] || PORTRAITS[a.species]) : null;
+  const src = portraitSrc(a);
   return src ? '<img class="mpic" src="' + src + '" alt="">' : '';
 }
 function buildImg(id) {
@@ -1742,7 +1785,7 @@ function updatePanels() {
     ? '<b>' + L.name + '</b> ' + sexSym(L) + ' &middot; ' + SPECIES[L.species].label + ' &middot; rules ' + ((day - leaderSince) / YEAR).toFixed(1) + 'y &middot; ambition ' + Math.round(L.ambition * 100) + '%'
     : 'the farmhouse stands empty';
   const pic = $('leaderPic');
-  const src = L && typeof PORTRAITS !== 'undefined' ? (PORTRAITS[L.name.toLowerCase()] || PORTRAITS[L.species]) : null;
+  const src = portraitSrc(L);
   if (src) { pic.src = src; pic.classList.add('show'); pic.title = 'Open ' + L.name + '’s papers'; } else { pic.classList.remove('show'); pic.title = ''; }
 
   const counts = {};
@@ -1778,13 +1821,13 @@ function updatePanels() {
     const avgOf = (arr, k) => arr.length ? arr.reduce((s, a) => s + a[k], 0) / arr.length : 0;
     const schemer = pigs.filter(a => a.role !== 'leader').sort((a, b) => b.ambition - a.ambition)[0];
     $('powerStats').innerHTML =
-      '<div class="pw"><span style="width:118px">next election</span><b>' + (96 - (day % 96)) + ' wks</b></div>' +
-      (L2 ? statRow('leader ambition', L2.ambition, '#E85638') : '') +
-      (schemer ? statRow('top schemer: ' + schemer.name, schemer.ambition, '#E85638') : '') +
-      statRow('pigs ×' + pigs.length + ' loyal', avgOf(pigs, 'loyalty'), '#D9A441') +
-      statRow('dogs ×' + dogs2.length + ' loyal', avgOf(dogs2, 'loyalty'), '#93ACB8') +
-      statRow('workers ×' + workers.length + ' loyal', avgOf(workers, 'loyalty'), '#E9E3D3') +
-      '<div class="pw"><span style="width:118px">meat for the dogs</span><b>' + (() => {
+      '<div class="pw"><span style="width:132px">next election</span><b>' + (96 - (day % 96)) + ' wks</b></div>' +
+      (L2 ? statRow('leader ambition', L2.ambition, '#E85638', 132) : '') +
+      (schemer ? statRow('schemer ' + schemer.name, schemer.ambition, '#E85638', 132) : '') +
+      statRow('pigs ×' + pigs.length + ' loyal', avgOf(pigs, 'loyalty'), '#D9A441', 132) +
+      statRow('dogs ×' + dogs2.length + ' loyal', avgOf(dogs2, 'loyalty'), '#93ACB8', 132) +
+      statRow('workers ×' + workers.length + ' loyal', avgOf(workers, 'loyalty'), '#E9E3D3', 132) +
+      '<div class="pw"><span style="width:132px">meat for the dogs</span><b>' + (() => {
         if (!dogs2.length) return '&mdash;';
         const drain = dogs2.length * 0.5 - Math.min(dogs2.length * 0.62, 2.2);
         return drain <= 0.05 ? 'the pack feeds itself' : (meatStock / drain).toFixed(0) + ' wks';
@@ -1799,7 +1842,10 @@ const SL = [['rProp', 'oProp', 'propaganda'], ['rRepr', 'oRepr', 'repression'], 
 let dragging = null;
 for (const [rid, oid, key] of SL) {
   const el = $(rid);
-  el.addEventListener('input', () => { R[key] = el.value / 100; $(oid).textContent = el.value; lastManual[key] = day; });
+  el.addEventListener('input', () => {
+    R[key] = el.value / 100; $(oid).textContent = el.value; lastManual[key] = day;
+    updatePanels();
+  });
   el.addEventListener('pointerdown', () => dragging = rid);
   el.addEventListener('pointerup', () => dragging = null);
 }
@@ -1897,7 +1943,7 @@ function renderHerd() {
   for (const a of list) {
     const row = document.createElement('div');
     row.className = 'hrow';
-    const img = typeof PORTRAITS !== 'undefined' ? (PORTRAITS[a.name.toLowerCase()] || PORTRAITS[a.species]) : null;
+    const img = portraitSrc(a);
     row.innerHTML = (img ? '<img src="' + img + '" alt="">' : '<span></span>') +
       '<span class="hn">' + a.name + ' <span class="' + (a.sex === 'f' ? 'sex-f' : 'sex-m') + '">' + (a.sex === 'f' ? '&#9792;' : '&#9794;') + '</span> <small>' + SPECIES[a.species].label + (a.role !== 'worker' ? ' · ' + a.role : '') + '</small></span>' +
       '<span class="hs">' + miniBar(a.health) + ' ' + miniBar(a.hunger, true) + (a.species === 'pig' ? ' ' + miniBar(a.ambition, true) : '') + '</span>';
@@ -1905,8 +1951,9 @@ function renderHerd() {
     herdEl.appendChild(row);
   }
 }
-function statRow(label, v, color) {
-  return '<div class="pw"><span style="width:78px">' + label + '</span><span class="track"><i style="width:' + Math.round(v * 100) + '%;background:' + (color || '#93ACB8') + '"></i></span><b>' + Math.round(v * 100) + '%</b></div>';
+function statRow(label, v, color, labelW) {
+  const shown = clamp(v, 0, 1);
+  return '<div class="pw"><span style="width:' + (labelW || 78) + 'px" title="' + String(label).replace(/"/g, '&quot;') + '">' + label + '</span><span class="track"><i style="width:' + Math.round(shown * 100) + '%;background:' + (color || '#93ACB8') + '"></i></span><b>' + Math.round(shown * 100) + '%</b></div>';
 }
 function animalPopup(a) {
   showPopup(a.name + ' ' + (a.sex === 'f' ? '&#9792;' : '&#9794;'),
@@ -1915,6 +1962,7 @@ function animalPopup(a) {
     '<span class="rd">' + a.activity + '</span><br>' +
     'eats ' + SPECIES[a.species].diet + (SPECIES[a.species].produce ? ' &middot; gives ' + (PRODUCE_NAME[a.species] || '') + ' +' + SPECIES[a.species].produce + '/wk' : '') + '<br><br>' +
     statRow('health', a.health, '#93ACB8') + statRow('hunger', a.hunger, '#E85638') +
+    statRow('thirst', a.thirst, '#93ACB8') +
     statRow('loyalty', a.loyalty, '#D9A441') + statRow('fear', a.fear, '#E85638') +
     statRow('grievance', a.grievance, '#E85638') + '<br>' +
     trait('strength', clamp(a.strength / 2.6, 0, 1)) + trait('courage', a.courage) +
@@ -1964,6 +2012,7 @@ $('spPause').addEventListener('click', () => { paused = !paused; renderSpeed(); 
 $('spMinus').addEventListener('click', () => { speedIdx = Math.max(0, speedIdx - 1); paused = false; renderSpeed(); });
 $('spPlus').addEventListener('click', () => { speedIdx = Math.min(SPEEDS.length - 1, speedIdx + 1); paused = false; renderSpeed(); });
 addEventListener('keydown', (e) => {
+  if (!$('intro').classList.contains('off')) return;
   if (e.target.tagName === 'INPUT') return;
   if (e.key === 'Escape' && placement) { placement = null; renderBuilds(); }
   if (popupOpen) return;
@@ -2465,23 +2514,25 @@ function drawScene(dt, t) {
     }
     if (a.x === 0 && a.y === 0) { const p = targetFor(a); a.x = p.x; a.y = p.y; }
     const dx = a.tx - a.x, dy = a.ty - a.y, dist = Math.hypot(dx, dy);
+    // pause and the title screen freeze the week, the walk, and the waterhole together
+    const simMoving = speedVal() > 0 && $('intro').classList.contains('off');
     if (dist > 3) {
       a.inside = false;
-      const sp = a.speed * Math.min(2.2, 0.7 + speedVal() * 0.35);
-      a.x += dx / dist * sp * dt;
-      a.y += dy / dist * sp * dt;
-      if (Math.abs(dx) > 3) a.face = dx >= 0 ? 1 : -1;
+      if (simMoving) {
+        const sp = a.speed * Math.min(2.2, 0.7 + speedVal() * 0.35);
+        a.x += dx / dist * sp * dt;
+        a.y += dy / dist * sp * dt;
+        if (Math.abs(dx) > 3) a.face = dx >= 0 ? 1 : -1;
+      }
     } else {
       if (a.wantInside) a.inside = true;
-      if (/drinking/.test(a.activity) && waterStock > 0.5) {
-        a.thirst = Math.max(0, a.thirst - dt * 0.35);
-        waterStock = Math.max(0, waterStock - dt * 0.4);
-      }
-      a.dwell -= dt;
-      if (a.dwell <= 0) {
-        const p = targetFor(a);
-        a.tx = p.x; a.ty = p.y;
-        a.dwell = /plow/.test(a.activity) ? rnd(1.5, 4) : rnd(6, 16);
+      if (simMoving) {
+        a.dwell -= dt;
+        if (a.dwell <= 0) {
+          const p = targetFor(a);
+          a.tx = p.x; a.ty = p.y;
+          a.dwell = /plow/.test(a.activity) ? rnd(1.5, 4) : rnd(6, 16);
+        }
       }
     }
     if (!a.inside) drawAnimal(a, t);
@@ -2489,6 +2540,7 @@ function drawScene(dt, t) {
   // placement ghost
   if (placement && mouseX >= 0) {
     const b = BUILDS.find(x => x.id === placement.id);
+    if (!b) { drawBanner(t); return; }
     const ok = canPlaceAt(mouseX, mouseY, b.w);
     const im = IMGS[b.id === 'apple' ? 'tree1' : b.id];
     mctx.globalAlpha = 0.55;
@@ -2532,7 +2584,7 @@ map.addEventListener('mousemove', (e) => {
   if (!best) { tip.style.display = 'none'; return; }
   const sp = SPECIES[best.species];
   const bar = (v, warn) => '<span class="bar' + (warn ? ' warn' : '') + '"><i style="width:' + Math.round(v * 100) + '%"></i></span>';
-  const face = typeof PORTRAITS !== 'undefined' ? (PORTRAITS[best.name.toLowerCase()] || PORTRAITS[best.species]) : null;
+  const face = portraitSrc(best);
   tip.innerHTML = (face ? '<img class="tip-pic" src="' + face + '" alt="">' : '') +
     '<b>' + best.name + ' ' + (best.sex === 'f' ? '&#9792;' : '&#9794;') + '</b><br>' + sp.label + (best.role !== 'worker' ? ' &middot; ' + best.role : '') + ' &middot; ' + ageStr(best) + '<br>' +
     '<span class="act">' + best.activity + '</span><br>' +
@@ -2570,9 +2622,14 @@ function loop(nowMs) {
   const t = nowMs / 1000;
   if (!placedOnce && MW > 300 && MH > 200) { computeGeo(); placeAtHomes(); placedOnce = true; }
   const sv = speedVal();
-  if (sv > 0) {
+  if (sv > 0 && $('intro').classList.contains('off')) {
     dayFrac += dt * PACE * sv;
-    while (dayFrac >= 1) { dayFrac -= 1; dailyStep(); }
+    while (dayFrac >= 1) {
+      dayFrac -= 1;
+      dailyStep();
+      // a decree, election or dilemma pauses the farm; do not spend the rest of the frame
+      if (paused || popupOpen) break;
+    }
   }
   drawScene(dt, t);
   requestAnimationFrame(loop);
@@ -2593,13 +2650,58 @@ window.F = {
     return false;
   },
   popupOk: () => { const btn = $('mBtns').firstChild; if (btn) btn.click(); },
-  set: (k, v) => { R[k] = v; lastManual[k] = day; syncSliders(); },
+  set: (k, v) => { R[k] = v; lastManual[k] = day; syncSliders(); updatePanels(); },
   court: (id) => { const c = COURT.find(x => x.id === id); if (c) c.fn(); },
-  state: () => ({ week: day, year: Math.floor(day / YEAR) + 1, alive: alive().length, buffer: +bufferDays().toFixed(1), meat: +meatStock.toFixed(0),
+  state: () => ({ week: day, year: Math.floor(day / YEAR) + 1, season: SEASONS[seasonOf(day)], alive: alive().length,
+                  buffer: +bufferDays().toFixed(1), food: +foodStock.toFixed(1), meat: +meatStock.toFixed(0),
                   grass: +grassStock.toFixed(0), water: +waterStock.toFixed(0),
                   loyalty: +avg('loyalty').toFixed(2), fear: +avg('fear').toFixed(2), dissent: +dissentShare().toFixed(2),
                   built: Object.keys(built), building: construction ? construction.id : null, popup: popupOpen,
-                  goldStreak, goldenAges, leader: (leaderOf() || {}).name })
+                  goldStreak, goldenAges, leader: (leaderOf() || {}).name, rulers: CONST.rulers }),
+  roster: () => alive().map(a => ({
+    name: a.name, species: a.species, sex: a.sex, role: a.role, age: a.age,
+    thirst: +a.thirst.toFixed(3), hunger: +a.hunger.toFixed(3), health: +a.health.toFixed(3),
+    perks: a.perks.slice()
+  })),
+  problems() {
+    const bad = [];
+    for (const [k, v] of [['food', foodStock], ['meat', meatStock], ['grass', grassStock], ['water', waterStock]]) {
+      if (!Number.isFinite(v)) bad.push(k + ' not finite');
+      else if (v < -1e-4) bad.push(k + ' ' + v);
+    }
+    if (alive().length > POP_CAP) bad.push('pop ' + alive().length);
+    for (const a of alive()) {
+      for (const k of ['hunger', 'thirst', 'health', 'loyalty', 'fear', 'grievance', 'ambition']) {
+        const v = a[k];
+        if (!Number.isFinite(v) || v < -1e-4 || v > 1.001) bad.push(a.name + '.' + k);
+      }
+      if (!a.perks || !a.perks.length) bad.push(a.name + ' no perk');
+    }
+    return bad;
+  },
+  step(n = 1) {
+    const errs = [];
+    for (let i = 0; i < n; i++) {
+      try { dailyStep(); }
+      catch (e) { errs.push(String(e && e.stack || e)); break; }
+      let guard = 0;
+      while (popupOpen && guard++ < 8) {
+        const buttons = [...$('mBtns').querySelectorAll('button')];
+        const btn = buttons[buttons.length - 1];
+        if (!btn) {
+          // the animal picker lives in the body; a fallen farm is waiting for a new start
+          if (!$('mBody').querySelector('button[data-sp]')) errs.push('popup without button: ' + $('mTitle').textContent);
+          break;
+        }
+        btn.click();
+      }
+    }
+    try { updatePanels(); } catch (e) { errs.push('panels ' + e); }
+    const s = this.state();
+    s.errs = errs;
+    s.bad = this.problems();
+    return s;
+  }
 };
 
 // boot
